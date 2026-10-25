@@ -94,6 +94,27 @@ button[hidden] { display: none !important; }
 .player small { color: var(--muted); }
 .empty { color: var(--muted); }
 footer { color: var(--muted); font-size: 13px; }
+.spinner { position: absolute; inset: 0; }
+.label {
+  position: absolute; left: 50%; top: 50%; width: max(200px, 56%); aspect-ratio: 1;
+  transform: translate(-50%, -50%); border-radius: 18px; overflow: hidden;
+  background: #000; box-shadow: 0 12px 40px rgba(0,0,0,.6), 0 0 0 6px #0b0b10;
+  opacity: 0; pointer-events: none; transition: opacity .4s ease;
+}
+.joined .label { opacity: 1; pointer-events: auto; }
+.label > *, .label iframe { width: 100% !important; height: 100% !important; display: block; border: 0; }
+.chat { display: flex; flex-direction: column; gap: 10px; background: rgba(21,21,29,.72); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+button.link { background: none; border: 0; padding: 0; color: var(--muted); font: 600 13px var(--body); text-transform: none; letter-spacing: 0; text-decoration: underline; cursor: pointer; }
+.msgs { height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; overscroll-behavior: contain; }
+.msg { line-height: 1.35; overflow-wrap: anywhere; }
+.msg b { color: var(--aux); font-weight: 700; margin-right: 6px; }
+.msg.me b { color: var(--glow); }
+.msg time { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.chat-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.chat-form input { flex: 1 1 140px; min-width: 0; font: 16px var(--body); color: var(--ink); background: var(--night); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; }
+.chat-form #chatName { flex: 0 1 140px; }
+.chat-form button { padding: 11px 20px; }
 </style>
 </head>
 <body class="paused">
@@ -105,10 +126,14 @@ footer { color: var(--muted); font-size: 13px; }
   </header>
 
   <main class="room">
-    <div class="record spin" id="record">
-      <div class="disc"></div>
-      <img id="art" alt="" hidden>
-      <div class="spindle"></div>
+    <div class="record" id="record">
+      <div class="spinner spin">
+        <div class="disc"></div>
+        <img id="art" alt="" hidden>
+        <div class="spindle"></div>
+      </div>
+      <!-- YouTube's player sits in the middle of the record while listening (tap Skip here if an ad plays). -->
+      <div class="label" id="label"><div id="yt"></div></div>
     </div>
     <section class="info" aria-live="polite">
       <div class="eyebrow" id="eyebrow">Waiting for the TV</div>
@@ -122,9 +147,14 @@ footer { color: var(--muted); font-size: 13px; }
         <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
       </div>
       <div class="status" id="status">Press Join to hear it here, in sync with the TV.</div>
-      <div class="player">
-        <div class="frame"><div id="yt"></div></div>
-        <small>Plays from YouTube on this device.</small>
+      <div class="chat" id="chat">
+        <div class="chat-head"><span>Chat</span><button type="button" class="link" id="rename" hidden></button></div>
+        <div class="msgs" id="msgs" aria-live="polite"><div class="empty" id="noMsgs">No messages yet. Say hi.</div></div>
+        <form class="chat-form" id="chatForm" autocomplete="off">
+          <input id="chatName" placeholder="Your name" maxlength="24" aria-label="Your name">
+          <input id="chatText" placeholder="Message" maxlength="300" aria-label="Message">
+          <button type="submit" class="primary">Send</button>
+        </form>
       </div>
     </section>
   </main>
@@ -235,6 +265,62 @@ footer { color: var(--muted); font-size: 13px; }
     render(); sync(changed || jumped);
   }
 
+  // ---- Chat: everyone on this link. Messages go over the same live channel; the latest ~40 are kept for people who join later.
+  let mq = null;
+  const chatTopic = 'auxchat/' + topic.replace(/^aux-/, '');
+  const chat = new Map();
+  const me = Math.random().toString(36).slice(2, 10);
+  let myName = ''; try { myName = localStorage.getItem('auxName') || ''; } catch (_) {}
+  function showName() {
+    $('chatName').style.display = myName ? 'none' : '';
+    $('rename').hidden = !myName;
+    $('rename').textContent = myName ? 'You are ' + myName + ' · change' : '';
+  }
+  showName();
+  $('rename').addEventListener('click', () => { myName = ''; showName(); $('chatName').focus(); });
+  function chatIn(raw, live) {
+    let m = raw; if (typeof raw === 'string') { try { m = JSON.parse(raw); } catch (_) { return; } }
+    if (!m || m.v !== 1 || !m.id || chat.has(m.id) || typeof m.m !== 'string') return;
+    m.n = String(m.n || 'Someone').slice(0, 24); m.m = m.m.slice(0, 300); m.ts = Number(m.ts) || Date.now();
+    chat.set(m.id, m);
+    drawChat();
+  }
+  function drawChat() {
+    const box = $('msgs');
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+    const list = [...chat.values()].sort((a, b) => a.ts - b.ts).slice(-100);
+    box.replaceChildren();
+    if (!list.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No messages yet. Say hi.'; box.append(e); return; }
+    for (const m of list) {
+      const row = document.createElement('div'); row.className = 'msg' + (m.from === me ? ' me' : '');
+      const who = document.createElement('b'); who.textContent = m.n;
+      const text = document.createElement('span'); text.textContent = m.m;
+      const t = document.createElement('time'); t.textContent = new Date(m.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+      row.append(who, text, t); box.append(row);
+    }
+    if (nearBottom) box.scrollTop = box.scrollHeight;
+  }
+  let lastSent = 0;
+  $('chatForm').addEventListener('submit', e => {
+    e.preventDefault();
+    if (!myName) {
+      const n = $('chatName').value.trim().slice(0, 24);
+      if (!n) { $('chatName').focus(); return; }
+      myName = n; try { localStorage.setItem('auxName', n); } catch (_) {}
+      showName();
+    }
+    const text = $('chatText').value.trim().slice(0, 300);
+    if (!text || !mq || !mq.connected || Date.now() - lastSent < 700) return;
+    lastSent = Date.now();
+    const m = {v: 1, id: me + '-' + Date.now().toString(36), from: me, n: myName, m: text, ts: Date.now()};
+    $('chatText').value = '';
+    chatIn(m, true);
+    mq.publish(chatTopic, JSON.stringify(m));
+    const recent = [...chat.values()].sort((a, b) => a.ts - b.ts).slice(-40);
+    mq.publish(chatTopic + '/h', JSON.stringify(recent), {retain: true});
+    $('msgs').scrollTop = $('msgs').scrollHeight;
+  });
+
   // Live updates from the TV. Main: an MQTT channel that keeps the latest state for late joiners.
   // Backup: ntfy.sh (song changes and play/pause only).
   function connect() {
@@ -244,8 +330,13 @@ footer { color: var(--muted); font-size: 13px; }
     lib.onload = () => {
       try {
         const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
-        c.on('connect', () => { c.subscribe('auxtogether/' + room); if (!state) $('liveText').textContent = 'Waiting'; });
-        c.on('message', (t, p) => receive(p.toString()));
+        mq = c;
+        c.on('connect', () => { c.subscribe(['auxtogether/' + room, chatTopic, chatTopic + '/h']); if (!state) $('liveText').textContent = 'Waiting'; });
+        c.on('message', (t, p) => {
+          if (t === chatTopic) chatIn(p.toString(), true);
+          else if (t === chatTopic + '/h') { try { (JSON.parse(p.toString()) || []).forEach(m => chatIn(m, false)); } catch (_) {} }
+          else receive(p.toString());
+        });
       } catch (_) {}
     };
     document.head.appendChild(lib);
@@ -259,7 +350,7 @@ footer { color: var(--muted); font-size: 13px; }
   // YouTube's own player plays the song on this device.
   window.onYouTubeIframeAPIReady = () => {
     player = new YT.Player('yt', {
-      width: 320, height: 180,
+      width: '100%', height: '100%',
       playerVars: {autoplay: 0, controls: 0, playsinline: 1, rel: 0, modestbranding: 1},
       events: {
         onReady: () => { ready = true; player.setVolume(Number($('volume').value)); if (joined) sync(true); },
@@ -278,14 +369,14 @@ footer { color: var(--muted); font-size: 13px; }
   document.head.appendChild(yt);
 
   $('join').addEventListener('click', () => {
-    joined = true;
+    joined = true; document.body.classList.add('joined');
     $('join').hidden = true; $('leave').hidden = false;
     $('status').textContent = state && !state.off ? 'Listening along.' : 'Joined. Music starts when the TV plays something.';
     if (ready) { player.unMute(); player.setVolume(Number($('volume').value)); }
     loadedId = ''; sync(true);
   });
   $('leave').addEventListener('click', () => {
-    joined = false; loadedId = '';
+    joined = false; loadedId = ''; document.body.classList.remove('joined');
     if (ready) player.stopVideo();
     $('join').hidden = false; $('leave').hidden = true;
     $('status').textContent = 'Stopped. Press Join to listen again.';
