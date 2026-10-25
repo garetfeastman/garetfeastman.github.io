@@ -225,8 +225,20 @@ footer { color: var(--muted); font-size: 13px; }
     render(); sync(true);
   }
 
-  // Live updates from the TV (a private channel named by the link's code).
+  // Live updates from the TV. Main: an MQTT channel that keeps the latest state for late joiners.
+  // Backup: ntfy.sh (song changes and play/pause only).
   function connect() {
+    const room = topic.replace(/^aux-/, '');
+    const lib = document.createElement('script');
+    lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
+    lib.onload = () => {
+      try {
+        const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
+        c.on('connect', () => { c.subscribe('auxtogether/' + room); if (!state) $('liveText').textContent = 'Waiting'; });
+        c.on('message', (t, p) => receive(p.toString()));
+      } catch (_) {}
+    };
+    document.head.appendChild(lib);
     const es = new EventSource('https://ntfy.sh/' + topic + '/sse?since=2h');
     es.onopen = () => { if (!state) $('liveText').textContent = 'Waiting'; };
     es.onmessage = e => { try { const m = JSON.parse(e.data); if (m.event === 'message' && m.message) receive(m.message); } catch (_) {} };
