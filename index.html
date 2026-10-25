@@ -133,6 +133,7 @@ footer { color: var(--muted); font-size: 13px; }
 
 <script>
 (() => {
+  window.addEventListener('hashchange', () => location.reload());
   const code = (location.hash || '').replace(/^#/, '').replace(/[^\w-]/g, '');
   const topic = !code ? '' : code.startsWith('aux-') ? code : 'aux-' + code;
   const $ = id => document.getElementById(id);
@@ -204,12 +205,15 @@ footer { color: var(--muted); font-size: 13px; }
     if (blocked) return;
     const ps = player.getPlayerState();
     if (state.playing) {
+      // Song finished here a moment before the TV moved on: wait for the TV's next song
+      // (don't restart this one from the beginning).
+      if (ps === YT.PlayerState.ENDED || (state.dur && want >= state.dur - 1.5)) return;
       if (ps !== YT.PlayerState.PLAYING && ps !== YT.PlayerState.BUFFERING) player.playVideo();
       const cur = player.getCurrentTime() || 0;
-      if (force || Math.abs(cur - want) > 2) player.seekTo(want, true);
+      if (force ? Math.abs(cur - want) > 1.5 : Math.abs(cur - want) > 5) player.seekTo(want, true);
     } else {
       if (ps === YT.PlayerState.PLAYING) player.pauseVideo();
-      if (force || Math.abs((player.getCurrentTime() || 0) - want) > 2) player.seekTo(want, true);
+      if (Math.abs((player.getCurrentTime() || 0) - want) > (force ? 1.5 : 5)) player.seekTo(want, true);
     }
   }
   setInterval(() => sync(false), 2000);
@@ -220,9 +224,15 @@ footer { color: var(--muted); font-size: 13px; }
     if (state && s.ts && state.ts && s.ts < state.ts) return; // older than what we have
     const age = Date.now() - (s.ts || Date.now());
     if (age > 6 * 3600 * 1000) return; // stale from hours ago
+    // Only jump when something really changed (new song, play/pause, or the TV skipped within the song).
+    // The TV's regular check-ins shouldn't move playback here.
+    const before = state ? expected() : 0;
+    const changed = !state || state.off || s.off || s.id !== state.id || !!s.playing !== !!state.playing;
     state = s; recvAt = Date.now();
-    lag = Math.min(5, Math.max(0, age / 1000));
-    render(); sync(true);
+    // Network delay estimate. Device clocks can differ, so keep it small and sane.
+    lag = age > 0 && age < 8000 ? Math.min(1.5, age / 1000) : 0.3;
+    const jumped = !changed && Math.abs(expected() - before) > 4;
+    render(); sync(changed || jumped);
   }
 
   // Live updates from the TV. Main: an MQTT channel that keeps the latest state for late joiners.
@@ -280,7 +290,13 @@ footer { color: var(--muted); font-size: 13px; }
     $('join').hidden = false; $('leave').hidden = true;
     $('status').textContent = 'Stopped. Press Join to listen again.';
   });
-  $('volume').addEventListener('input', () => { if (ready) player.setVolume(Number($('volume').value)); });
+  const setVol = () => { if (!ready) return; const v = Number($('volume').value); if (v > 0) player.unMute(); player.setVolume(v); };
+  $('volume').addEventListener('input', setVol);
+  $('volume').addEventListener('change', setVol);
+  // Phones only let their own volume buttons change the sound: hide the slider there.
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform))) {
+    const vl = document.querySelector('label.vol'); if (vl) vl.style.display = 'none';
+  }
 })();
 </script>
 </body>
