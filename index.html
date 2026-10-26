@@ -43,6 +43,9 @@ body {
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: .02em; }
 .brand b { color: var(--aux); }
+.head-right { display: flex; align-items: center; gap: 14px; }
+button.share { padding: 8px 18px; font-size: 14px; }
+button.share.done { border-color: var(--aux); color: var(--aux); }
 .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
 .live[data-state="live"] .dot { background: var(--aux); box-shadow: 0 0 0 0 var(--aux); animation: pulse 1.8s infinite; }
@@ -144,7 +147,10 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
 <div class="wrap">
   <header>
     <div class="brand"><b>AUX</b> Together</div>
-    <div class="live" id="live" data-state="waiting"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+    <div class="head-right">
+      <div class="live" id="live" data-state="waiting"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+      <button type="button" class="share" id="share" hidden>Share</button>
+    </div>
   </header>
 
   <main class="room">
@@ -207,6 +213,22 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     return;
   }
   $('foot').textContent = 'Room ' + topic;
+
+  // Share: a short link to this room (phones get their share menu; computers copy it).
+  const roomLink = location.origin + '/#' + topic.replace(/^aux-/, '');
+  $('share').hidden = false;
+  $('share').addEventListener('click', async () => {
+    const done = text => { $('share').textContent = text; $('share').classList.add('done'); setTimeout(() => { $('share').textContent = 'Share'; $('share').classList.remove('done'); }, 2200); };
+    if (navigator.share && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      try { await navigator.share({title: 'AUX Together', text: 'Listen along with me', url: roomLink}); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(roomLink); done('Link copied'); return; } catch (_) {}
+    const t = document.createElement('textarea'); t.value = roomLink; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.append(t); t.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+    t.remove();
+    if (ok) done('Link copied'); else window.prompt('Copy this link:', roomLink);
+  });
 
   function expected() {
     if (!state) return 0;
