@@ -57,9 +57,11 @@ button, input, select { font: inherit; color: inherit; }
 .me[hidden] { display: none; }
 
 /* Main: record | song | chat */
-.room { min-height: 0; display: grid; grid-template-columns: minmax(0, 46vh) minmax(0, 1fr) minmax(300px, 400px); gap: 40px; align-items: stretch; padding: 6px 0 26px; }
-.left { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; padding-top: 34px; }
-.record { position: relative; width: 100%; aspect-ratio: 1; }
+.room { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, min(30vw, 480px)) minmax(300px, min(28vw, 440px)); gap: 40px; align-items: stretch; padding: 6px 0 26px; }
+.left { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; padding-top: 34px; }
+.record { position: relative; width: min(100%, 58vh); aspect-ratio: 1; }
+.left .controls { margin-top: 6px; justify-content: center; }
+.left .status { margin-top: 0; text-align: center; max-width: 58vh; }
 .middle { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 22px; }
 .spinner { position: absolute; inset: 0; }
 .disc { position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, #0d0d0f 0 2px, #18181d 2px 4px); box-shadow: 0 30px 80px rgba(0,0,0,.65), inset 0 0 0 1px var(--line); }
@@ -82,7 +84,7 @@ button, input, select { font: inherit; color: inherit; }
 
 .info { display: flex; flex-direction: column; min-width: 0; }
 .eyebrow { font-size: 14px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--aux); }
-h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; margin: 12px 0 8px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; margin: 12px 0 8px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .artist { font-size: clamp(20px, 2.2vw, 28px); font-weight: 500; color: var(--soft); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .album { font-size: 19px; color: var(--muted); margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tourline { margin-top: 14px; font-size: 15px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 22px; }
@@ -100,7 +102,8 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
 .big[hidden] { display: none; }
 .vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
 .vol input { width: 140px; accent-color: #fff; }
-.status { margin-top: 16px; color: var(--muted); font-size: 15px; min-height: 22px; }
+.status { margin-top: 16px; color: var(--muted); font-size: 15px; }
+.status:empty { display: none; }
 .status a { color: #fff; }
 
 /* Chat */
@@ -204,6 +207,12 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
           <div class="spindle"></div>
         </div>
       </div>
+      <div class="controls">
+        <button class="big" id="join" type="button">Join and listen</button>
+        <button class="big ghost" id="leave" type="button" hidden>Stop listening</button>
+        <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
+      </div>
+      <div class="status" id="status"></div>
       <button type="button" class="link" id="peek" hidden>Ad playing? Show the player</button>
     </section>
 
@@ -218,12 +227,6 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
         <div class="bar"><i id="fill"></i></div>
         <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
       </div>
-      <div class="controls">
-        <button class="big" id="join" type="button">Join and listen</button>
-        <button class="big ghost" id="leave" type="button" hidden>Stop listening</button>
-        <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
-      </div>
-      <div class="status" id="status">Press Join to hear it here, in sync with the TV.</div>
     </section>
 
     <aside class="chat" aria-label="Chat">
@@ -250,8 +253,22 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     <div class="brand"><b>AUX</b> Together</div>
     <p id="gateText">Sign in with Google to join the room.</p>
     <div id="gbtn"></div>
-    <small>Your Google name and picture show next to your messages. Messages are signed, so nobody can post as you.</small>
+    <small>You only sign in once on this device. You'll pick a nickname for the chat next. Messages are signed, so nobody can post as you.</small>
   </div>
+</div>
+
+<!-- Nickname -->
+<div class="modal" id="nickModal" hidden>
+  <form class="sheet" id="nickForm" role="dialog" aria-labelledby="nTitle" style="width:min(440px,100%)">
+    <h2 id="nTitle">Your nickname</h2>
+    <div class="sub">This is what everyone sees in the chat.</div>
+    <div style="padding:0 22px 6px"><input id="nickInput" maxlength="24" autocomplete="nickname" placeholder="Nickname" style="width:100%;font-size:18px;background:#0c0c10;border:1px solid var(--line);border-radius:12px;padding:12px 14px"></div>
+    <div class="acts">
+      <button class="link" type="button" id="signOut" style="margin-right:auto" hidden>Sign out</button>
+      <button class="pill" type="button" id="nickCancel" hidden>Cancel</button>
+      <button class="big" type="submit">Save</button>
+    </div>
+  </form>
 </div>
 
 <!-- Owner: who can do what -->
@@ -299,8 +316,25 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
   // ------------------------------------------------------------ identity (Google + a signing key for this visit)
   // Each visit makes a key pair; Google's sign-in token is tied to its public key (the token's "nonce").
   // Every chat message is signed with the private key, which never leaves this browser.
-  let me = null; // {sub, email, name, picture, cert}
+  let me = null; // {sub, email, name, picture, cert, nick}
   let keys = null, nonce = '';
+  const KEEP_DAYS = 30;
+  // The signing key (can't be exported) and the sign-in stay in this browser, so people sign in once.
+  const idb = (mode, fn) => new Promise((ok, bad) => {
+    const req = indexedDB.open('aux-together', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('id');
+    req.onerror = () => bad(req.error);
+    req.onsuccess = () => {
+      const tx = req.result.transaction('id', mode), st = tx.objectStore('id');
+      const r = fn(st);
+      tx.oncomplete = () => ok(r && 'result' in r ? r.result : undefined);
+      tx.onerror = () => bad(tx.error);
+    };
+  });
+  const loadId = () => idb('readonly', st => st.get('me')).catch(() => null);
+  const saveId = v => idb('readwrite', st => st.put(v, 'me')).catch(() => {});
+  const dropId = () => idb('readwrite', st => st.delete('me')).catch(() => {});
+  const cleanNick = x => String(x || '').replace(/\s+/g, ' ').trim().slice(0, 24);
   const certs = new Map();   // jwt -> Promise<identity|null>
   let jwks = null;
   async function googleKeys() {
@@ -326,7 +360,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
         if (pay.aud !== CLIENT_ID || !/^(https:\/\/)?accounts\.google\.com$/.test(pay.iss)) return null;
         if (!pay.email_verified) return null;
         if (pay.nonce !== b64u(await sha(unb64u(cert.pub)))) return null;
-        if (Date.now() / 1000 - pay.iat > 7 * 86400) return null;
+        if (Date.now() / 1000 - pay.iat > KEEP_DAYS * 86400) return null;
         const pub = await crypto.subtle.importKey('spki', unb64u(cert.pub), {name: 'ECDSA', namedCurve: 'P-256'}, false, ['verify']);
         const email = String(pay.email || '').toLowerCase();
         return {sub: pay.sub, email, name: pay.name || pay.given_name || 'Someone', picture: pay.picture || '', pub, owner: hex(await sha(email)) === OWNER_HASH};
@@ -364,16 +398,33 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
   // ------------------------------------------------------------ sign in
   async function startSignIn() {
     if (!CLIENT_ID) { $('gateText').textContent = 'Sign-in is being set up. Check back in a few minutes.'; return; }
-    keys = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, false, ['sign', 'verify']);
+    $('gate').hidden = true;
+    const saved = await loadId();
+    if (saved && saved.keys && saved.pub) {
+      keys = saved.keys;
+      if (saved.jwt) {
+        const who = await verifyCert({jwt: saved.jwt, pub: saved.pub});
+        if (who) {
+          me = {sub: who.sub, email: who.email, name: who.name, picture: who.picture, owner: who.owner, cert: {jwt: saved.jwt, pub: saved.pub}, nick: cleanNick(saved.nick)};
+          signedIn();
+          return;
+        }
+      }
+    } else {
+      keys = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, false, ['sign', 'verify']);
+    }
+    $('gate').hidden = false;
     const spki = await crypto.subtle.exportKey('spki', keys.publicKey);
     const pub = b64u(spki);
     nonce = b64u(await sha(spki));
+    const lastNick = saved && saved.nick;
     const ready = () => {
       google.accounts.id.initialize({client_id: CLIENT_ID, nonce, auto_select: true, cancel_on_tap_outside: false, callback: async res => {
         const cert = {jwt: res.credential, pub};
         const who = await verifyCert(cert);
         if (!who) { $('gateText').textContent = "Couldn't confirm that sign-in. Please try again."; return; }
-        me = {sub: who.sub, email: who.email, name: who.name, picture: who.picture, owner: who.owner, cert};
+        me = {sub: who.sub, email: who.email, name: who.name, picture: who.picture, owner: who.owner, cert, nick: cleanNick(lastNick)};
+        await saveId({keys, pub, jwt: res.credential, nick: me.nick});
         signedIn();
       }});
       google.accounts.id.renderButton($('gbtn'), {theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with'});
@@ -384,12 +435,29 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
   }
   function signedIn() {
     $('gate').hidden = true;
-    $('me').hidden = false; $('meImg').src = me.picture; $('meName').textContent = me.name;
+    $('me').hidden = false; $('meImg').src = me.picture; $('meName').textContent = me.nick || '';
     showRole();
-    sayHello();
+    if (!me.nick) askNick(true); else sayHello();
   }
-  $('me').addEventListener('click', () => {
-    if (!confirm('Sign out of AUX Together?')) return;
+  function askNick(first) {
+    $('nickInput').value = me.nick || '';
+    $('signOut').hidden = first; $('nickCancel').hidden = first;
+    $('nickModal').hidden = false;
+    setTimeout(() => $('nickInput').focus(), 50);
+  }
+  $('nickForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const n = cleanNick($('nickInput').value);
+    if (!n) { $('nickInput').focus(); return; }
+    me.nick = n; $('meName').textContent = n;
+    $('nickModal').hidden = true;
+    await saveId({keys, pub: me.cert.pub, jwt: me.cert.jwt, nick: n});
+    sayHello(); drawChat();
+  });
+  $('nickCancel').addEventListener('click', () => { $('nickModal').hidden = true; });
+  $('me').addEventListener('click', () => askNick(false));
+  $('signOut').addEventListener('click', async () => {
+    await dropId();
     try { google.accounts.id.disableAutoSelect(); } catch (_) {}
     location.reload();
   });
@@ -461,11 +529,14 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
   async function userIn(raw) {
     const m = await open(raw);
     if (!m || m.body.type !== 'hello') return;
-    people.set(m.who.sub, {sub: m.who.sub, name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: m.body.ts});
+    const prev = people.get(m.who.sub);
+    if (prev && prev.ts > m.body.ts) return;
+    people.set(m.who.sub, {sub: m.who.sub, nick: cleanNick(m.body.nick), name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: m.body.ts});
+    drawChat();
   }
   async function sayHello() {
     if (!me || !mq || !mq.connected) return;
-    mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', ts: Date.now()}), {retain: true});
+    mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', nick: me.nick || '', ts: Date.now()}), {retain: true});
   }
 
   // ------------------------------------------------------------ chat
@@ -476,7 +547,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     const key = m.who.sub + ':' + m.body.id;
     if (chat.has(key)) return;
     chat.set(key, {who: m.who, body: m.body, raw: m.raw});
-    people.set(m.who.sub, Object.assign(people.get(m.who.sub) || {}, {sub: m.who.sub, name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner}));
+    if (!people.has(m.who.sub)) people.set(m.who.sub, {sub: m.who.sub, nick: cleanNick(m.body.nick), name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: 0});
     drawChat();
   }
   const notes = [];
@@ -487,6 +558,12 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     notes.push({ts: Number(n.ts), text: n.text.slice(0, 200), ok: !!n.ok});
     if (n.id && n.ok) { requested.add(String(n.id)); drawQueue(); }
     drawChat();
+  }
+  // Chat shows nicknames only (latest one each person set), never Google names.
+  function nickOf(sub, body) {
+    if (me && sub === me.sub && me.nick) return me.nick;
+    const p = people.get(sub);
+    return (p && p.nick) || cleanNick(body && body.nick) || 'Guest';
   }
   function drawChat() {
     const box = $('msgs');
@@ -503,7 +580,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
       const img = document.createElement('img'); img.alt = ''; img.src = who.picture; img.referrerPolicy = 'no-referrer';
       const right = document.createElement('div');
       const name = document.createElement('div'); name.className = 'who';
-      const nm = document.createElement('span'); nm.textContent = who.name; name.append(nm);
+      const nm = document.createElement('span'); nm.textContent = nickOf(who.sub, body); name.append(nm);
       if (r !== 'listener') { const b = document.createElement('span'); b.className = 'badge'; b.textContent = r; name.append(b); }
       const t = document.createElement('time'); t.textContent = new Date(body.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); name.append(t);
       const text = document.createElement('div'); text.className = 'text';
@@ -526,7 +603,8 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     if (/^!request\s*$/i.test(text)) { notes.push({ts: Date.now(), text: 'Type the song after !request, like: !request Mr. Brightside', ok: false}); drawChat(); return; }
     lastSent = Date.now();
     $('chatText').value = '';
-    const body = {type: 'chat', id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, ts: Date.now()};
+    if (!me.nick) { askNick(true); return; }
+    const body = {type: 'chat', id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, nick: me.nick, ts: Date.now()};
     const msg = await signed(body);
     chatIn(msg);
     mq.publish(T.chat, msg);
@@ -544,13 +622,13 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
       const row = document.createElement('div'); row.className = 'person';
       const img = document.createElement('img'); img.alt = ''; img.src = p.picture || ''; img.referrerPolicy = 'no-referrer';
       const txt = document.createElement('div');
-      const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name;
-      const em = document.createElement('div'); em.className = 'e'; em.textContent = p.email;
+      const n = document.createElement('div'); n.className = 'n'; n.textContent = p.nick || p.name;
+      const em = document.createElement('div'); em.className = 'e'; em.textContent = (p.nick ? p.name + ' · ' : '') + p.email;
       txt.append(n, em);
       let ctl;
       if (p.owner) { ctl = document.createElement('span'); ctl.className = 'badge'; ctl.style.color = 'var(--gold)'; ctl.textContent = 'owner'; }
       else {
-        ctl = document.createElement('select'); ctl.dataset.sub = p.sub; ctl.dataset.name = p.name;
+        ctl = document.createElement('select'); ctl.dataset.sub = p.sub; ctl.dataset.name = p.nick || p.name;
         for (const r of ['listener', 'admin']) { const o = document.createElement('option'); o.value = r; o.textContent = r[0].toUpperCase() + r.slice(1); ctl.append(o); }
         ctl.value = roles[p.sub] && roles[p.sub].r === 'admin' ? 'admin' : 'listener';
       }
@@ -620,7 +698,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
       loadedId = state.id; blocked = '';
       if (state.playing) player.loadVideoById({videoId: state.id, startSeconds: want});
       else player.cueVideoById({videoId: state.id, startSeconds: want});
-      $('status').textContent = 'Listening along.';
+      $('status').textContent = '';
       return;
     }
     if (blocked) return;
@@ -695,7 +773,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     if (!me) { $('gate').hidden = false; return; }
     joined = true; document.body.classList.add('joined'); $('peek').hidden = false;
     $('join').hidden = true; $('leave').hidden = false;
-    $('status').textContent = state && !state.off ? 'Listening along.' : 'Joined. Music starts when the TV plays something.';
+    $('status').textContent = state && !state.off ? '' : 'Music starts when the TV plays something.';
     if (ready) { player.unMute(); player.setVolume(Number($('volume').value)); }
     loadedId = ''; sync(true);
   });
@@ -703,7 +781,7 @@ h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; m
     joined = false; loadedId = ''; document.body.classList.remove('joined', 'peek'); $('peek').hidden = true; $('peek').textContent = 'Ad playing? Show the player';
     if (ready) player.stopVideo();
     $('join').hidden = false; $('leave').hidden = true;
-    $('status').textContent = 'Stopped. Press Join to listen again.';
+    $('status').textContent = '';
   });
   $('peek').addEventListener('click', () => {
     const on = document.body.classList.toggle('peek');
