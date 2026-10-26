@@ -135,7 +135,23 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .sys { font-size: 13px; color: var(--muted); text-align: center; padding: 2px 6px; }
 .sys.ok { color: #9ee6a8; }
 .empty { color: var(--muted); font-size: 14px; }
-.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); position: relative; flex-wrap: wrap; }
+.whisper-to { flex-basis: 100%; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c9b6ff; }
+.whisper-to[hidden] { display: none; }
+.whisper-to button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+.msg .who > span:first-child, .msg img { cursor: pointer; }
+.msg .who > span:first-child:hover { text-decoration: underline; }
+.mention { color: #fff; background: rgba(122,162,255,.18); border-radius: 5px; padding: 0 3px; }
+.mention.me { background: rgba(255,78,106,.28); }
+.msg.at-me { background: rgba(255,78,106,.07); border-radius: 10px; margin: 0 -8px; padding: 4px 8px; }
+.msg.whisper .text { color: #d9ccff; font-style: italic; }
+.msg.whisper .wtag { font-size: 11px; color: #b49cff; font-weight: 500; }
+.pop { position: fixed; z-index: 40; min-width: 180px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+.pop[hidden] { display: none; }
+.pop button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 15px; }
+.pop button:hover, .pop button.sel { background: rgba(255,255,255,.08); }
+.pop img { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; background: #333; }
+.pop .h { font-size: 12px; color: var(--muted); padding: 4px 10px 6px; letter-spacing: .08em; text-transform: uppercase; }
 .chat-form input { flex: 1; min-width: 0; font-size: 16px; background: #0c0c10; border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; }
 .chat-form button { height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--aux); color: #fff; font-weight: 700; cursor: pointer; }
 .hint { padding: 0 18px 10px; font-size: 12px; color: var(--muted); }
@@ -261,6 +277,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       <div class="msgs" id="msgs"><div class="empty">No messages yet. Say hi.</div></div>
       <div class="hint" id="hint" hidden>Admins can type <b>!request</b> and a song name to play it next.</div>
       <form class="chat-form" id="chatForm" autocomplete="off">
+        <div class="whisper-to" id="whisperTo" hidden><span>🔒 Whispering to <b id="whisperName"></b> (only they can read it)</span><button type="button" id="whisperOff" aria-label="Stop whispering">×</button></div>
         <input id="chatText" placeholder="Message" maxlength="300" aria-label="Message">
         <button type="submit">Send</button>
       </form>
@@ -284,6 +301,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   </div>
 </div>
 
+<div class="pop" id="userPop" hidden></div>
+<div class="pop" id="mentionPop" hidden></div>
+
 <!-- Nickname -->
 <div class="modal" id="nickModal" hidden>
   <form class="sheet" id="nickForm" role="dialog" aria-labelledby="nTitle" style="width:min(440px,100%)">
@@ -305,6 +325,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     <div class="sub">Admins can request songs with <b>!request</b>. Everyone else is a listener.</div>
     <div class="people" id="people"></div>
     <div class="acts">
+      <button class="link" type="button" id="mPurge" style="margin-right:auto;color:#ff8a9b">Clear the chat log for everyone</button>
       <button class="pill" type="button" id="mCancel">Cancel</button>
       <button class="big" type="button" id="mSave">Save</button>
     </div>
@@ -344,7 +365,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   // Each visit makes a key pair; Google's sign-in token is tied to its public key (the token's "nonce").
   // Every chat message is signed with the private key, which never leaves this browser.
   let me = null; // {sub, email, name, picture, cert, nick}
-  let keys = null, nonce = '';
+  let keys = null, nonce = '', dh = null, dhPub = '';
   const KEEP_DAYS = 30;
   // The signing key (can't be exported) and the sign-in stay in this browser, so people sign in once.
   const idb = (mode, fn) => new Promise((ok, bad) => {
@@ -408,7 +429,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const ok = await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, who.pub, unb64u(m.s), enc.encode(m.b)).catch(() => false);
     if (!ok) return null;
     let body; try { body = JSON.parse(m.b); } catch (_) { return null; }
-    return {who, body, raw: m};
+    return {who, body, raw: typeof raw === 'string' ? raw : JSON.stringify(m)};
   }
 
   // ------------------------------------------------------------ roles (set by the owner, signed by the owner)
@@ -427,8 +448,11 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (!CLIENT_ID) { $('gateText').textContent = 'Sign-in is being set up. Check back in a few minutes.'; return; }
     $('gate').hidden = true;
     const saved = await loadId();
+    dh = saved && saved.dh ? saved.dh : await crypto.subtle.generateKey({name: 'ECDH', namedCurve: 'P-256'}, false, ['deriveKey']);
+    dhPub = b64u(await crypto.subtle.exportKey('raw', dh.publicKey));
     if (saved && saved.keys && saved.pub) {
       keys = saved.keys;
+      if (!saved.dh) saveId(Object.assign({}, saved, {dh}));
       if (saved.jwt) {
         const who = await verifyCert({jwt: saved.jwt, pub: saved.pub});
         if (who) {
@@ -451,7 +475,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
         const who = await verifyCert(cert);
         if (!who) { $('gateText').textContent = "Couldn't confirm that sign-in. Please try again."; return; }
         me = {sub: who.sub, email: who.email, name: who.name, picture: who.picture, owner: who.owner, cert, nick: cleanNick(lastNick)};
-        await saveId({keys, pub, jwt: res.credential, nick: me.nick});
+        await saveId({keys, pub, jwt: res.credential, nick: me.nick, dh});
         signedIn();
       }});
       google.accounts.id.renderButton($('gbtn'), {theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with'});
@@ -464,6 +488,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     $('gate').hidden = true;
     $('me').hidden = false; $('meImg').src = me.picture; $('meName').textContent = me.nick || '';
     showRole();
+    earlyWhispers.splice(0).forEach(chatIn);
     if (!me.nick) askNick(true); else sayHello();
   }
   function askNick(first) {
@@ -478,7 +503,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (!n) { $('nickInput').focus(); return; }
     me.nick = n; $('meName').textContent = n;
     $('nickModal').hidden = true;
-    await saveId({keys, pub: me.cert.pub, jwt: me.cert.jwt, nick: n});
+    await saveId({keys, pub: me.cert.pub, jwt: me.cert.jwt, nick: n, dh});
     sayHello(); drawChat();
   });
   $('nickCancel').addEventListener('click', () => { $('nickModal').hidden = true; });
@@ -500,21 +525,24 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   // ------------------------------------------------------------ live channel
   let mq = null;
   const T = {state: 'auxtogether/' + room, tour: 'auxtour/' + room, chat: 'auxchat/' + room, hist: 'auxchat/' + room + '/h',
-             roles: 'auxroles/' + room, users: 'auxusers/' + room, tv: 'auxtv/' + room, queue: 'auxqueue/' + room};
+             roles: 'auxroles/' + room, users: 'auxusers/' + room, tv: 'auxtv/' + room, queue: 'auxqueue/' + room,
+             log: 'auxchat/' + room + '/m', purge: 'auxchat/' + room + '/purge'};
   function connect() {
     const lib = document.createElement('script');
     lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
     lib.onload = () => {
       const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
       mq = c;
-      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
+      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue, T.log + '/+', T.purge]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
       c.on('close', () => { $('liveText').textContent = 'Reconnecting…'; });
       c.on('message', (t, p, packet) => {
         const s = p.toString();
         if (t === T.state) receive(s, packet && packet.retain);
         else if (t === T.tour) tourIn(s);
         else if (t === T.chat) chatIn(s);
-        else if (t === T.hist) { try { (JSON.parse(s) || []).forEach(chatIn); } catch (_) {} }
+        else if (t === T.hist) { try { (JSON.parse(s) || []).forEach(r => chatIn(r)); } catch (_) {} }
+        else if (t.startsWith(T.log + '/')) { if (s) chatIn(s, t); }
+        else if (t === T.purge) purgeIn(s);
         else if (t === T.roles) rolesIn(s);
         else if (t.startsWith(T.users + '/')) userIn(s);
         else if (t === T.tv) tvIn(s);
@@ -558,22 +586,76 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (!m || m.body.type !== 'hello') return;
     const prev = people.get(m.who.sub);
     if (prev && prev.ts > m.body.ts) return;
-    people.set(m.who.sub, {sub: m.who.sub, nick: cleanNick(m.body.nick), name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: m.body.ts});
+    people.set(m.who.sub, {sub: m.who.sub, nick: cleanNick(m.body.nick), name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: m.body.ts, dh: typeof m.body.dh === 'string' ? m.body.dh : ''});
     drawChat();
   }
   async function sayHello() {
     if (!me || !mq || !mq.connected) return;
-    mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', nick: me.nick || '', ts: Date.now()}), {retain: true});
+    mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', nick: me.nick || '', dh: dhPub, ts: Date.now()}), {retain: true});
   }
 
   // ------------------------------------------------------------ chat
   const chat = new Map(); // key -> {who, body, el}
-  async function chatIn(raw) {
+  // Whispers: encrypted with a key only the two people can work out (ECDH + AES-GCM).
+  // Everyone else just sees scrambled bytes go by, so the page doesn't show them at all.
+  const pairKeys = new Map(), earlyWhispers = [];
+  async function pairKey(otherDh) {
+    if (!pairKeys.has(otherDh)) pairKeys.set(otherDh, (async () => {
+      const pub = await crypto.subtle.importKey('raw', unb64u(otherDh), {name: 'ECDH', namedCurve: 'P-256'}, false, []);
+      return crypto.subtle.deriveKey({name: 'ECDH', public: pub}, dh.privateKey, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+    })());
+    return pairKeys.get(otherDh);
+  }
+  // ---- The chat log is kept forever: every message is stored on the relay under its own name,
+  // and each browser also keeps its own copy. Only the owner can clear it (a purge signed by the owner).
+  let purgeTs = 0, logSaveTimer = 0;
+  const logKey = 'log:' + room;
+  const logTopic = (sub, id) => T.log + '/' + String(sub).slice(-10) + '-' + id;
+  function saveLog() {
+    clearTimeout(logSaveTimer);
+    logSaveTimer = setTimeout(() => {
+      const raws = [...chat.values()].sort((a, b) => a.body.ts - b.body.ts).slice(-3000).map(x => x.raw);
+      idb('readwrite', st => st.put({purgeTs, raws, notes: notes.slice(-300)}, logKey)).catch(() => {});
+    }, 800);
+  }
+  async function loadLog() {
+    const l = await idb('readonly', st => st.get(logKey)).catch(() => null);
+    if (!l) return;
+    purgeTs = Math.max(purgeTs, l.purgeTs || 0);
+    (l.notes || []).forEach(n => { if (n.ts > purgeTs && !notes.some(x => x.ts === n.ts && x.text === n.text)) notes.push(n); });
+    for (const r of l.raws || []) await chatIn(r, null, true);
+    drawChat();
+  }
+  async function purgeIn(raw) {
+    if (!raw) return;
     const m = await open(raw);
-    if (!m || m.body.type !== 'chat' || typeof m.body.text !== 'string') return;
+    if (!m || !m.who.owner || m.body.type !== 'purge' || !(m.body.ts > purgeTs)) return;
+    purgeTs = m.body.ts;
+    for (const [k, x] of chat) if (x.body.ts <= purgeTs) chat.delete(k);
+    for (let i = notes.length - 1; i >= 0; i--) if (notes[i].ts <= purgeTs) notes.splice(i, 1);
+    drawChat(); saveLog();
+  }
+  async function chatIn(raw, topic, fromCache) {
+    const m = await open(raw);
+    if (!m || typeof m.body.id !== 'string') return;
+    if (m.body.ts <= purgeTs) return;
     const key = m.who.sub + ':' + m.body.id;
     if (chat.has(key)) return;
+    if (m.body.type === 'whisper') {
+      if (!me || !dh) { earlyWhispers.push(raw); return; } // read again once we know who you are
+      if (m.body.to !== me.sub && m.who.sub !== me.sub) return; // not ours
+      try {
+        const other = m.who.sub === me.sub ? m.body.toDh : m.body.fromDh;
+        const k = await pairKey(other);
+        const plain = await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64u(m.body.iv)}, k, unb64u(m.body.ct));
+        m.body = Object.assign({}, m.body, {text: new TextDecoder().decode(plain).slice(0, 300)});
+      } catch (_) { return; }
+    } else if (m.body.type !== 'chat' || typeof m.body.text !== 'string') return;
     chat.set(key, {who: m.who, body: m.body, raw: m.raw});
+    if (!fromCache) saveLog();
+    if (fromCache) return;
+    if (m.body.type === 'whisper' && m.who.sub !== me.sub) ping('🔒 ' + nickOf(m.who.sub, m.body));
+    else if (me && m.who.sub !== me.sub && mentionsMe(m.body.text)) ping('@ ' + nickOf(m.who.sub, m.body));
     if (!people.has(m.who.sub)) people.set(m.who.sub, {sub: m.who.sub, nick: cleanNick(m.body.nick), name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: 0});
     drawChat();
   }
@@ -582,7 +664,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     let n; try { n = JSON.parse(raw); } catch (_) { return; }
     if (!n || n.v !== 1 || typeof n.text !== 'string' || !n.ts) return;
     if (notes.some(x => x.ts === n.ts && x.text === n.text)) return;
+    if (Number(n.ts) <= purgeTs) return;
     notes.push({ts: Number(n.ts), text: n.text.slice(0, 200), ok: !!n.ok});
+    saveLog();
     if (n.id && n.ok) { requested.add(String(n.id)); drawQueue(); }
     drawChat();
   }
@@ -592,6 +676,120 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const p = people.get(sub);
     return (p && p.nick) || cleanNick(body && body.nick) || 'Guest';
   }
+  // ---- @mentions
+  const knownNicks = () => [...people.values()].map(p => (me && p.sub === me.sub ? me.nick : p.nick)).filter(Boolean).sort((a, b) => b.length - a.length);
+  function mentionsMe(text) {
+    return !!(me && me.nick && new RegExp('(^|\\s)@' + me.nick.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w])', 'i').test(text || ''));
+  }
+  function withMentions(text) {
+    const out = []; let i = 0, plain = '';
+    const nicks = knownNicks();
+    while (i < text.length) {
+      if (text[i] === '@' && (i === 0 || /\s/.test(text[i - 1]))) {
+        const hit = nicks.find(n => text.substr(i + 1, n.length).toLowerCase() === n.toLowerCase() && !/\w/.test(text[i + 1 + n.length] || ''));
+        if (hit) {
+          if (plain) { out.push(plain); plain = ''; }
+          const sp = document.createElement('span'); sp.className = 'mention' + (me && me.nick && hit.toLowerCase() === me.nick.toLowerCase() ? ' me' : '');
+          sp.textContent = '@' + text.substr(i + 1, hit.length); out.push(sp);
+          i += 1 + hit.length; continue;
+        }
+      }
+      plain += text[i++];
+    }
+    if (plain) out.push(plain);
+    return out;
+  }
+  // A tiny heads-up when someone @'s you or whispers: tab title blinks while the tab is in the background.
+  let pingTimer = 0;
+  function ping(what) {
+    if (!document.hidden) return;
+    const base = document.title.replace(/^\(.*?\) /, '');
+    document.title = '(' + what + ') ' + base;
+    clearTimeout(pingTimer);
+    const back = () => { document.title = base; document.removeEventListener('visibilitychange', back); };
+    document.addEventListener('visibilitychange', back);
+  }
+  // ---- clicking a name / picture
+  let whisperTarget = null;
+  function hidePops() { $('userPop').hidden = true; $('mentionPop').hidden = true; }
+  document.addEventListener('click', e => { if (!e.target.closest('.pop') && !e.target.closest('.msg .who > span:first-child') && !e.target.closest('.msg img')) $('userPop').hidden = true; });
+  function placePop(pop, x, y) {
+    pop.hidden = false;
+    const w = pop.offsetWidth, h = pop.offsetHeight;
+    pop.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + 'px';
+    pop.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + 'px';
+  }
+  function userMenu(sub, e) {
+    e.stopPropagation();
+    if (!me) return;
+    const pop = $('userPop'); pop.replaceChildren();
+    const p = people.get(sub) || {};
+    const h = document.createElement('div'); h.className = 'h'; h.textContent = nickOf(sub); pop.append(h);
+    if (sub !== me.sub) {
+      const w = document.createElement('button'); w.type = 'button'; w.textContent = '🔒  Whisper';
+      if (!p.dh) { w.disabled = true; w.title = 'They need to open the latest version of the page first.'; w.style.opacity = .5; }
+      w.addEventListener('click', () => { startWhisper(sub); hidePops(); });
+      pop.append(w);
+    }
+    const m = document.createElement('button'); m.type = 'button'; m.textContent = '@  Mention';
+    m.addEventListener('click', () => { insertMention(nickOf(sub)); hidePops(); });
+    pop.append(m);
+    placePop(pop, e.clientX + 6, e.clientY + 6);
+  }
+  function startWhisper(sub) {
+    whisperTarget = sub;
+    $('whisperName').textContent = nickOf(sub);
+    $('whisperTo').hidden = false;
+    $('chatText').placeholder = 'Whisper to ' + nickOf(sub);
+    $('chatText').focus();
+  }
+  function stopWhisper() { whisperTarget = null; $('whisperTo').hidden = true; $('chatText').placeholder = 'Message'; }
+  $('whisperOff').addEventListener('click', stopWhisper);
+  function insertMention(nick, replaceFrom) {
+    const box = $('chatText');
+    const v = box.value, at = box.selectionStart ?? v.length;
+    const from = replaceFrom ?? at;
+    const before = v.slice(0, from), after = v.slice(at);
+    const ins = (before && !/\s$/.test(before) ? ' ' : '') + '@' + nick + ' ';
+    box.value = before + ins + after;
+    const pos = (before + ins).length; box.focus(); box.setSelectionRange(pos, pos);
+  }
+  // Typing "@" shows matching people.
+  let mentionSel = 0;
+  function mentionQuery() {
+    const box = $('chatText'), v = box.value.slice(0, box.selectionStart ?? box.value.length);
+    const m = v.match(/(^|\s)@([^@\n]{0,24})$/);
+    return m ? {from: v.length - m[2].length - 1, q: m[2].toLowerCase()} : null;
+  }
+  function showMentions() {
+    const pop = $('mentionPop');
+    const mq_ = mentionQuery();
+    if (!mq_ || !me) { pop.hidden = true; return; }
+    const list = [...people.values()].filter(p => p.sub !== me.sub && p.nick && p.nick.toLowerCase().startsWith(mq_.q)).slice(0, 6);
+    if (!list.length) { pop.hidden = true; return; }
+    mentionSel = Math.min(mentionSel, list.length - 1);
+    pop.replaceChildren();
+    list.forEach((p, i) => {
+      const b = document.createElement('button'); b.type = 'button'; if (i === mentionSel) b.className = 'sel';
+      const im = document.createElement('img'); im.alt = ''; im.src = p.picture || ''; im.referrerPolicy = 'no-referrer';
+      b.append(im, p.nick);
+      b.addEventListener('mousedown', ev => { ev.preventDefault(); insertMention(p.nick, mentionQuery().from); pop.hidden = true; });
+      pop.append(b);
+    });
+    const r = $('chatText').getBoundingClientRect();
+    pop.hidden = false;
+    placePop(pop, r.left, r.top - pop.offsetHeight - 6);
+  }
+  $('chatText').addEventListener('input', () => { mentionSel = 0; showMentions(); });
+  $('chatText').addEventListener('blur', () => setTimeout(() => { $('mentionPop').hidden = true; }, 150));
+  $('chatText').addEventListener('keydown', e => {
+    const pop = $('mentionPop');
+    if (e.key === 'Escape') { if (!pop.hidden) pop.hidden = true; else if (whisperTarget) stopWhisper(); return; }
+    if (pop.hidden) return;
+    const items = pop.querySelectorAll('button');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mentionSel = (mentionSel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length; showMentions(); }
+    else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); items[mentionSel].dispatchEvent(new MouseEvent('mousedown')); }
+  });
   function drawChat() {
     const box = $('msgs');
     const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -604,16 +802,23 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       const {who, body} = it.x;
       const r = roleOf(who);
       const row = document.createElement('div'); row.className = 'msg r-' + r;
+      const isW = body.type === 'whisper';
+      if (isW) row.classList.add('whisper');
+      else if (me && who.sub !== me.sub && mentionsMe(body.text)) row.classList.add('at-me');
       const img = document.createElement('img'); img.alt = ''; img.src = who.picture; img.referrerPolicy = 'no-referrer';
+      img.addEventListener('click', e => userMenu(who.sub, e));
       const right = document.createElement('div');
       const name = document.createElement('div'); name.className = 'who';
       const nm = document.createElement('span'); nm.textContent = nickOf(who.sub, body); name.append(nm);
+      nm.addEventListener('click', e => userMenu(who.sub, e));
+      if (isW) { const w = document.createElement('span'); w.className = 'wtag'; w.textContent = who.sub === me.sub ? '🔒 to ' + nickOf(body.to) : '🔒 whispered to you'; name.append(w); }
       if (r !== 'listener') { const b = document.createElement('span'); b.className = 'badge'; b.textContent = r; name.append(b); }
       const t = document.createElement('time'); t.textContent = new Date(body.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); name.append(t);
       const text = document.createElement('div'); text.className = 'text';
       const isReq = /^!request\s+\S/i.test(body.text);
       if (isReq) { text.classList.add('req'); text.textContent = 'Requested: ' + body.text.replace(/^!request\s+/i, ''); }
-      else text.textContent = body.text;
+      else if (isW) text.textContent = body.text;
+      else text.append(...withMentions(body.text));
       right.append(name, text); row.append(img, right); box.append(row);
     }
     if (near) box.scrollTop = box.scrollHeight;
@@ -624,19 +829,26 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (!me) { $('gate').hidden = false; return; }
     const text = $('chatText').value.trim().slice(0, 300);
     if (!text || !mq || !mq.connected || Date.now() - lastSent < 700) return;
-    if (/^!request\b/i.test(text) && RANK[roleOf(me)] < 1) {
+    if (!whisperTarget && /^!request\b/i.test(text) && RANK[roleOf(me)] < 1) {
       notes.push({ts: Date.now(), text: 'Only admins can request songs.', ok: false}); drawChat(); return;
     }
     if (/^!request\s*$/i.test(text)) { notes.push({ts: Date.now(), text: 'Type the song after !request, like: !request Mr. Brightside', ok: false}); drawChat(); return; }
     lastSent = Date.now();
     $('chatText').value = '';
     if (!me.nick) { askNick(true); return; }
-    const body = {type: 'chat', id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, nick: me.nick, ts: Date.now()};
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    let body;
+    if (whisperTarget) {
+      const p = people.get(whisperTarget);
+      if (!p || !p.dh) { notes.push({ts: Date.now(), text: "Can't whisper to them yet; they need to reload the page.", ok: false}); drawChat(); return; }
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, await pairKey(p.dh), enc.encode(text));
+      body = {type: 'whisper', id, to: whisperTarget, toDh: p.dh, fromDh: dhPub, iv: b64u(iv), ct: b64u(ct), nick: me.nick, ts: Date.now()};
+    } else body = {type: 'chat', id, text, nick: me.nick, ts: Date.now()};
     const msg = await signed(body);
     chatIn(msg);
     mq.publish(T.chat, msg);
-    const recent = [...chat.values()].sort((a, b) => a.body.ts - b.body.ts).slice(-40).map(x => x.raw);
-    mq.publish(T.hist, JSON.stringify(recent), {retain: true});
+    mq.publish(logTopic(me.sub, id), msg, {retain: true, qos: 1});
     $('msgs').scrollTop = $('msgs').scrollHeight;
   });
 
@@ -664,6 +876,17 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     $('manageModal').hidden = false;
   });
   $('mCancel').addEventListener('click', () => { $('manageModal').hidden = true; });
+  $('mPurge').addEventListener('click', async () => {
+    if (!me || !me.owner || !mq) return;
+    if (!confirm('Delete the whole chat log for everyone? This cannot be undone.')) return;
+    const ts = Date.now();
+    const msg = await signed({type: 'purge', ts});
+    mq.publish(T.purge, msg, {retain: true, qos: 1});
+    for (const x of chat.values()) mq.publish(logTopic(x.who.sub, x.body.id), '', {retain: true}); // remove stored copies
+    mq.publish(T.hist, '', {retain: true});
+    await purgeIn(msg);
+    $('manageModal').hidden = true;
+  });
   $('mSave').addEventListener('click', async () => {
     if (!me || !me.owner || !mq) return;
     const next = {};
@@ -904,7 +1127,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     window.prompt('Copy this link:', roomLink);
   });
 
-  connect();
+  loadLog().finally(connect);
   startSignIn();
 })();
 </script>
