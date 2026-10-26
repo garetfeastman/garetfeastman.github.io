@@ -59,8 +59,42 @@ button, input, select { font: inherit; color: inherit; }
 .me[hidden] { display: none; }
 
 /* Main: record | song | chat */
-.room { --rec: min(54vh, 34vw); min-height: 0; display: grid; grid-template-columns: var(--rec) minmax(300px, 480px) minmax(290px, 430px); justify-content: center; column-gap: 72px; align-items: stretch; padding: 6px 0 26px; }
-.left { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; padding-top: 34px; }
+.room { --rec: min(46vh, 31vw); min-height: 0; display: grid; grid-template-columns: var(--rec) minmax(300px, 480px) minmax(290px, 430px); justify-content: center; column-gap: 72px; align-items: stretch; padding: 6px 0 26px; }
+.left { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; min-height: 0; padding-top: 34px; }
+/* Tonight's Mix: the room's running playlist, under the record */
+.mix { width: 100%; flex: 1 1 0; min-height: 170px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; backdrop-filter: blur(10px); }
+.mix .mlist { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 6px; overscroll-behavior: contain; }
+.mrow { display: grid; grid-template-columns: 38px 1fr auto; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; }
+.mrow:hover { background: rgba(255,255,255,.04); }
+.mrow img { width: 38px; height: 38px; border-radius: 7px; object-fit: cover; background: #222; }
+.mrow .tt { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow .aa { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mrow .rm { width: 26px; height: 26px; border-radius: 50%; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; opacity: 0; }
+.mrow:hover .rm, .mrow .rm:focus-visible { opacity: 1; }
+.mrow .rm:hover { color: #ff8f9f; background: rgba(255,143,159,.12); }
+.mix .macts { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.sbtn { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: #1e1e24; color: var(--soft); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.sbtn:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+.sbtn.hot { background: var(--aux); border-color: var(--aux); color: #fff; }
+.sbtn[hidden] { display: none; }
+.sbtn:disabled { opacity: .55; cursor: default; }
+.addmix { margin-top: 12px; align-self: flex-start; }
+.qrow .qadd { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: #1e1e24; color: var(--soft); cursor: pointer; font-size: 16px; line-height: 1; opacity: 0; }
+.qrow:hover .qadd, .qrow .qadd:focus-visible { opacity: 1; }
+.qrow .qadd:hover { background: var(--aux); border-color: var(--aux); color: #fff; }
+.qrow .qadd.in { opacity: .8; color: #9ee6a8; cursor: default; background: none; }
+@media (hover: none) { .qrow .qadd, .mrow .rm { opacity: 1; } }
+.field { width: 100%; font-size: 16px; background: #0c0c10; border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; color: var(--ink); }
+.saved { padding: 4px 22px 10px; display: flex; flex-direction: column; gap: 10px; }
+.saved[hidden] { display: none; }
+.saved .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.saved small { color: var(--muted); font-size: 12.5px; }
+.mixes { overflow-y: auto; padding: 0 12px 8px; }
+.mixrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; }
+.mixrow:hover { background: rgba(255,255,255,.04); }
+.mixrow .n { font-weight: 600; }
+.mixrow .d { color: var(--muted); font-size: 13px; }
+.mixrow .b { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .record { position: relative; width: 100%; aspect-ratio: 1; }
 /* Tonearm: rests off the record, swings on when you join. */
 .arm { position: absolute; z-index: 3; left: -5%; top: -3%; width: 26%; height: 58%; pointer-events: none;
@@ -202,7 +236,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 /* Up next */
 .queue { min-height: 0; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; backdrop-filter: blur(10px); }
 .qlist { flex: 1; overflow-y: auto; padding: 0 10px 10px; overscroll-behavior: contain; }
-.qrow { display: grid; grid-template-columns: 22px 48px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; }
+.qrow { display: grid; grid-template-columns: 22px 48px 1fr auto auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; }
 .qrow:hover { background: rgba(255,255,255,.04); }
 .qrow .n { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
 .qrow img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #222; }
@@ -255,11 +289,12 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 
 @media (max-width: 1100px) {
   body { overflow: auto; }
-  .app { height: auto; min-height: 100dvh; padding: 0 16px; }
+  .app { height: auto; min-height: 100dvh; padding: 0 16px; overflow-x: clip; }
   .room { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-bottom: 24px; }
   .record { width: min(calc(100% - 40px), 420px); }
   .chat { height: 460px; flex: none; }
   .queue { max-height: 560px; }
+  .mix { flex: none; height: 360px; }
   .left { padding-top: 0; }
   .clock { display: none; }
   .top { flex-wrap: wrap; padding-top: 16px; }
@@ -316,6 +351,15 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       </div>
       <div class="status" id="status"></div>
       <button type="button" class="link" id="peek" hidden>Ad playing? Show the player</button>
+      <aside class="mix" aria-label="Tonight's Mix">
+        <div class="chat-head"><span>Tonight's Mix</span><span id="mixCount"></span></div>
+        <div class="mlist" id="mlist"><div class="empty" style="padding:8px">Requests and songs the room votes in land here.</div></div>
+        <div class="macts">
+          <button class="sbtn hot" type="button" id="mixSave" disabled>Save this mix</button>
+          <button class="sbtn" type="button" id="mixMine">My mixes</button>
+          <button class="sbtn" type="button" id="mixFresh" hidden style="margin-left:auto">Start fresh</button>
+        </div>
+      </aside>
     </section>
 
     <div class="middle">
@@ -325,6 +369,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       <p class="artist" id="artist"></p>
       <p class="album" id="album"></p>
       <div class="tourline" id="tour"></div>
+      <button class="sbtn addmix" type="button" id="addNow" hidden>+ Add to Tonight's Mix</button>
       <div class="time">
         <div class="bar"><i id="fill"></i></div>
         <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
@@ -365,6 +410,31 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 <div class="pop" id="mentionPop" hidden></div>
 
 <!-- Nickname -->
+<div class="modal" id="saveModal" hidden>
+  <form class="sheet" id="saveForm" role="dialog" aria-labelledby="svTitle" style="width:min(520px,100%)">
+    <h2 id="svTitle">Save this mix</h2>
+    <div class="sub" id="svSub"></div>
+    <div style="padding:0 22px 12px"><input class="field" id="svName" maxlength="60" placeholder="Name it" aria-label="Mix name"></div>
+    <div class="saved" id="svDone" hidden>
+      <div class="row"><input class="field" id="svLink" readonly aria-label="Link to this mix" style="font-size:13px;flex:1;min-width:0"></div>
+      <div class="row"><button class="sbtn" type="button" id="svCopy">Copy link</button><button class="sbtn" type="button" id="svOpen">Open</button></div>
+      <div class="row" id="svYt"></div>
+      <small>YouTube opens the songs as a playlist. Save it there and it shows up in YouTube Music under Library.</small>
+    </div>
+    <div class="acts">
+      <button class="pill" type="button" id="svClose">Close</button>
+      <button class="big" type="submit" id="svGo">Save</button>
+    </div>
+  </form>
+</div>
+<div class="modal" id="mixesModal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="mxTitle" style="width:min(600px,100%)">
+    <h2 id="mxTitle">My mixes</h2>
+    <div class="sub" id="mxSub">Saved on this device. Each one has a link you can keep or share.</div>
+    <div class="mixes" id="mixes"></div>
+    <div class="acts"><button class="pill" type="button" id="mxClose">Close</button></div>
+  </div>
+</div>
 <div class="modal" id="nickModal" hidden>
   <form class="sheet" id="nickForm" role="dialog" aria-labelledby="nTitle" style="width:min(440px,100%)">
     <h2 id="nTitle">Your nickname</h2>
@@ -403,7 +473,8 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   const RANK = {listener: 0, admin: 1, owner: 2};
 
   window.addEventListener('hashchange', () => location.reload());
-  const code = (location.hash || '').replace(/^#/, '').replace(/[^\w-]/g, '');
+  const code = (location.hash || '').replace(/^#/, '').split('&')[0].replace(/[^\w-]/g, '');
+  const linkedMix = ((location.hash || '').match(/[&]mix=([\w-]+)/) || [])[1] || '';
   const room = code.replace(/^aux-/, '');
   const $ = id => document.getElementById(id);
   const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
@@ -500,7 +571,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (!m || !m.who.owner || m.body.type !== 'roles' || typeof m.body.roles !== 'object') return;
     if (m.body.ts < rolesTs) return;
     roles = m.body.roles || {}; rolesTs = m.body.ts;
-    drawChat(); showRole();
+    drawChat(); showRole(); drawMix();
   }
 
   // ------------------------------------------------------------ sign in
@@ -548,6 +619,8 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     $('gate').hidden = true;
     $('me').hidden = false; $('bell').hidden = false; drawBell(); $('meImg').src = me.picture; $('meName').textContent = me.nick || '';
     showRole();
+    drawMix(); drawQueue();
+    openLinkedMix();
     earlyWhispers.splice(0).forEach(chatIn);
     if (!me.nick) askNick(true); else sayHello();
   }
@@ -586,14 +659,14 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   let mq = null;
   const T = {state: 'auxtogether/' + room, tour: 'auxtour/' + room, chat: 'auxchat/' + room, hist: 'auxchat/' + room + '/h',
              roles: 'auxroles/' + room, users: 'auxusers/' + room, tv: 'auxtv/' + room, queue: 'auxqueue/' + room,
-             log: 'auxchat/' + room + '/m', purge: 'auxchat/' + room + '/purge', here: 'auxhere/' + room};
+             log: 'auxchat/' + room + '/m', purge: 'auxchat/' + room + '/purge', here: 'auxhere/' + room, mix: 'auxmix/' + room};
   function connect() {
     const lib = document.createElement('script');
     lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
     lib.onload = () => {
       const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
       mq = c;
-      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue, T.log + '/+', T.purge, T.here]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
+      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue, T.log + '/+', T.purge, T.here, T.mix]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
       c.on('close', () => { $('liveText').textContent = 'Reconnecting…'; });
       c.on('message', (t, p, packet) => {
         const s = p.toString();
@@ -608,6 +681,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
         else if (t === T.tv) tvIn(s);
         else if (t === T.queue) queueIn(s);
         else if (t === T.here && !(packet && packet.retain)) hereIn(s);
+        else if (t === T.mix) mixIn(s);
       });
     };
     document.head.appendChild(lib);
@@ -636,7 +710,11 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       const aa = document.createElement('div'); aa.className = 'aa'; aa.textContent = it.a || '';
       txt.append(tt, aa);
       const len = document.createElement('span'); len.className = 'len'; len.textContent = it.len ? fmt(it.len) : '';
-      row.append(n, img, txt, len); box.append(row);
+      const add = document.createElement('button'); add.type = 'button'; add.className = 'qadd';
+      if (inMix(it.id)) { add.classList.add('in'); add.textContent = '✓'; add.title = 'In Tonight\'s Mix'; add.disabled = true; }
+      else { add.textContent = '+'; add.title = 'Add to Tonight\'s Mix'; add.setAttribute('aria-label', 'Add ' + (it.t || 'song') + ' to Tonight\'s Mix');
+        add.addEventListener('click', () => addToMix({id: it.id, t: String(it.t || '').slice(0, 120), a: String(it.a || '').slice(0, 120), art: /^https:\/\//.test(it.art || '') ? it.art : '', len: it.len || 0})); }
+      row.append(n, img, txt, len, add); box.append(row);
     });
   }
 
@@ -733,7 +811,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       m.body = Object.assign({}, m.body, {text: ''});
     } else if (m.body.type !== 'chat' || typeof m.body.text !== 'string') return;
     chat.set(key, {who: m.who, body: m.body, raw: m.raw});
-    if (isSkip(m.body)) { const v = voteOf(key); v.yes.add(m.who.sub); v.no.delete(m.who.sub); }
+    if (voteKind(m.body)) { const v = voteOf(key); v.yes.add(m.who.sub); v.no.delete(m.who.sub); }
     if (!fromCache) saveLog();
     if (fromCache) return;
     if (m.body.type === 'whisper' && m.who.sub !== me.sub) ping('🔒 ' + nickOf(m.who.sub, m.body));
@@ -970,6 +1048,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   // vote skip within a minute. The TV counts the (signed) votes itself and does the skipping.
   const SKIP_SHARE = 0.6, VOTE_MS = 60000;
   const isSkip = b => b && b.type === 'chat' && /^!skip$/i.test(String(b.text || '').trim()) && typeof b.song === 'string' && !!b.song;
+  const isAddVote = b => b && b.type === 'chat' && /^!add$/i.test(String(b.text || '').trim()) && b.song && typeof b.song === 'object' && /^[\w-]{11}$/.test(b.song.id || '');
+  const voteKind = b => isSkip(b) ? 'skip' : isAddVote(b) ? 'add' : '';
+  const ADD_SHARE = 0.5;
   const votes = new Map();   // vote key -> {yes:Set, no:Set}
   const voteOf = k => { if (!votes.has(k)) votes.set(k, {yes: new Set(), no: new Set()}); return votes.get(k); };
   function voteIn(m) {
@@ -981,16 +1062,23 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   }
   function voteOpen(k) {
     const x = chat.get(k);
-    return !!(x && Date.now() - x.body.ts < VOTE_MS && state && !state.off && state.id === x.body.song);
+    if (!x || Date.now() - x.body.ts >= VOTE_MS) return false;
+    if (isAddVote(x.body)) return !inMix(x.body.song.id);
+    return !!(state && !state.off && state.id === x.body.song);
   }
-  function openVoteNow() {
-    for (const [k, x] of chat) if (isSkip(x.body) && voteOpen(k)) return k;
+  function openVoteNow(kind, songId) {
+    for (const [k, x] of chat) {
+      if (voteKind(x.body) !== (kind || 'skip') || !voteOpen(k)) continue;
+      if (kind === 'add' && x.body.song.id !== songId) continue;
+      return k;
+    }
     return null;
   }
   function tally(k) {
-    const v = voteOf(k), all = inRoom();
+    const v = voteOf(k), all = inRoom(), x = chat.get(k);
     v.yes.forEach(s => all.add(s)); v.no.forEach(s => all.add(s));
-    const total = Math.max(1, all.size), need = Math.max(1, Math.ceil(total * SKIP_SHARE - 1e-9));
+    const share = x && isAddVote(x.body) ? ADD_SHARE : SKIP_SHARE;
+    const total = Math.max(1, all.size), need = Math.max(1, Math.ceil(total * share - 1e-9));
     return {yes: v.yes.size, no: v.no.size, total, need};
   }
   async function castVote(k, yes) {
@@ -1003,23 +1091,26 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   function fillVote(el, k) {
     const x = chat.get(k); if (!x) return;
     const t = tally(k), open = voteOpen(k), mine = me ? (voteOf(k).yes.has(me.sub) ? 'yes' : voteOf(k).no.has(me.sub) ? 'no' : '') : '';
+    const isAdd = isAddVote(x.body), added = isAdd && inMix(x.body.song.id);
     el.replaceChildren();
     const bar = document.createElement('div'); bar.className = 'vbar';
     const fill = document.createElement('i'); fill.style.width = Math.min(100, t.yes / t.need * 100) + '%'; bar.append(fill);
     const line = document.createElement('div'); line.className = 'vline';
-    const passed = t.yes >= t.need;
-    line.textContent = passed ? 'Passed: skipping…' : t.yes + ' of ' + t.need + ' skip votes needed (' + t.total + ' in the room)' + (t.no ? ' · ' + t.no + ' keep' : '');
+    const passed = added || (!isAdd && t.yes >= t.need) || (isAdd && t.yes >= t.need && open);
+    if (added) fill.style.width = '100%';
+    line.textContent = added ? '✓ In Tonight\'s Mix' : passed ? (isAdd ? 'Passed: adding…' : 'Passed: skipping…')
+      : t.yes + ' of ' + t.need + (isAdd ? ' yes votes' : ' skip votes') + ' needed (' + t.total + ' in the room)' + (t.no ? ' · ' + t.no + (isAdd ? ' no' : ' keep') : '');
     el.append(bar, line);
     if (open && !passed && me) {
       const row = document.createElement('div'); row.className = 'vbtns';
-      const y = document.createElement('button'); y.type = 'button'; y.textContent = '⏭ Skip'; if (mine === 'yes') y.className = 'on';
-      const n = document.createElement('button'); n.type = 'button'; n.textContent = 'Keep it'; if (mine === 'no') n.className = 'on';
+      const y = document.createElement('button'); y.type = 'button'; y.textContent = isAdd ? '+ Add it' : '⏭ Skip'; if (mine === 'yes') y.className = 'on';
+      const n = document.createElement('button'); n.type = 'button'; n.textContent = isAdd ? 'Not this one' : 'Keep it'; if (mine === 'no') n.className = 'on';
       y.addEventListener('click', () => castVote(k, true));
       n.addEventListener('click', () => castVote(k, false));
       const left = document.createElement('span'); left.className = 'vleft'; left.textContent = Math.max(0, Math.ceil((VOTE_MS - (Date.now() - x.body.ts)) / 1000)) + 's';
       row.append(y, n, left); el.append(row);
     } else if (!open && !passed) { const c = document.createElement('div'); c.className = 'vline'; c.textContent = 'Vote closed'; el.append(c); }
-    el.classList.toggle('closed', !open);
+    el.classList.toggle('closed', !open && !added);
   }
   function updateVotes() { document.querySelectorAll('#msgs .vote[data-key]').forEach(el => fillVote(el, el.dataset.key)); }
   setInterval(() => { if (document.querySelector('#msgs .vote:not(.closed)')) updateVotes(); }, 1000);
@@ -1084,6 +1175,10 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       let voteEl = null;
       const isReq = !isW && isRequest(body.text);
       if (isReq) { text.classList.add('req'); text.textContent = 'Requested: ' + reqQuery(body.text); }
+      else if (!isW && isAddVote(body)) {
+        text.classList.add('cmd'); text.textContent = 'wants to add “' + String(body.song.t || 'a song').slice(0, 80) + '” to Tonight\'s Mix';
+        voteEl = document.createElement('div'); voteEl.className = 'vote'; voteEl.dataset.key = it.k; fillVote(voteEl, it.k);
+      }
       else if (!isW && isSkip(body)) {
         text.classList.add('cmd'); text.textContent = 'wants to skip ' + (body.title ? '“' + String(body.title).slice(0, 80) + '”' : 'this song');
         voteEl = document.createElement('div'); voteEl.className = 'vote'; voteEl.dataset.key = it.k; fillVote(voteEl, it.k);
@@ -1129,6 +1224,12 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       if (open) { $('chatText').value = ''; castVote(open, true); return; }   // a vote is already going: that's a skip vote
       skipExtra = {song: state.id, title: state.t || ''};
     }
+    if (!whisperTarget && /^!add$/i.test(text)) {
+      $('chatText').value = '';
+      if (!state || state.off || !state.id) { notes.push({ts: Date.now(), text: 'Nothing is playing to add.', ok: false}); drawChat(); return; }
+      addToMix(songNow());
+      return;
+    }
     const listenerReq = !whisperTarget && isRequest(text) && RANK[roleOf(me)] < 1;
     if (listenerReq) {
       const wait = 30000 - (Date.now() - lastReq);
@@ -1153,6 +1254,186 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     mq.publish(logTopic(me.sub, id), msg, {retain: true, qos: 1});
     $('msgs').scrollTop = $('msgs').scrollHeight;
   });
+
+  // ------------------------------------------------------------ Tonight's Mix
+  // The TV keeps the room's running playlist (every request, plus songs admins add or the room votes in)
+  // and shares it as auxmix/<room>. Admins add instantly; a listener's "+" starts a 50% vote in the chat.
+  let mix = null;
+  const mixIds = () => new Set(mix && Array.isArray(mix.items) ? mix.items.map(x => x.id) : []);
+  const inMix = id => mixIds().has(id);
+  const canEditMix = () => !!me && RANK[roleOf(me)] >= 1;
+  function mixIn(raw) {
+    let m; try { m = JSON.parse(raw); } catch (_) { return; }
+    if (!m || m.v !== 1 || !Array.isArray(m.items)) return;
+    if (mix && m.ts < mix.ts) return;
+    mix = m;
+    clearTimeout(mixWait); mixWait = 0;
+    drawMix(); drawQueue(); updateVotes();
+  }
+  function songNow() {
+    return state && state.id ? {id: state.id, t: String(state.t || '').slice(0, 120), a: String(state.a || '').slice(0, 120), art: /^https:\/\//.test(state.art || '') ? state.art : '', len: Math.round(state.dur || 0)} : null;
+  }
+  function drawMix() {
+    const box = $('mlist'); box.replaceChildren();
+    const items = mix && Array.isArray(mix.items) ? mix.items : [];
+    $('mixCount').textContent = items.length ? items.length + (items.length === 1 ? ' song' : ' songs') : '';
+    $('mixSave').disabled = !items.length;
+    $('mixFresh').hidden = !(me && me.owner) || !items.length;
+    const now = songNow();
+    $('addNow').hidden = !now;
+    if (now) { const there = inMix(now.id); $('addNow').disabled = there; $('addNow').textContent = there ? '✓ In Tonight\'s Mix' : '+ Add to Tonight\'s Mix'; }
+    if (!items.length) { const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '8px'; e.textContent = mix ? 'Requests and songs the room votes in land here.' : 'Tonight\'s Mix shows up once the TV has the latest AUX.'; box.append(e); return; }
+    items.forEach(it => {
+      const row = document.createElement('div'); row.className = 'mrow';
+      const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+      img.src = /^https:\/\//.test(it.art || '') ? it.art : 'https://i.ytimg.com/vi/' + it.id + '/default.jpg';
+      const txt = document.createElement('div'); txt.style.minWidth = '0';
+      const tt = document.createElement('div'); tt.className = 'tt'; tt.textContent = it.t || 'Unknown song';
+      const aa = document.createElement('div'); aa.className = 'aa'; aa.textContent = [it.a, it.by ? (it.via === 'request' ? 'requested by ' : it.via === 'vote' ? 'voted in, from ' : 'added by ') + it.by : ''].filter(Boolean).join(' · ');
+      txt.append(tt, aa); row.append(img, txt);
+      if (canEditMix()) {
+        const rm = document.createElement('button'); rm.type = 'button'; rm.className = 'rm'; rm.textContent = '×'; rm.title = 'Take it out of the mix'; rm.setAttribute('aria-label', 'Remove ' + (it.t || 'song'));
+        rm.addEventListener('click', () => mixCmd({op: 'remove', song: it.id}));
+        row.append(rm);
+      } else row.append(document.createElement('span'));
+      box.append(row);
+    });
+  }
+  let mixWait = 0;
+  async function mixCmd(extra) {
+    if (!me || !mq || !mq.connected) return;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    mq.publish(T.chat, await signed(Object.assign({type: 'mix', id, nick: me.nick, ts: Date.now()}, extra)));
+    clearTimeout(mixWait);
+    mixWait = setTimeout(() => { notes.push({ts: Date.now(), text: "The TV didn't answer. Is AUX open on the TV (and updated)?", ok: false}); drawChat(); }, 8000);
+  }
+  async function addToMix(song) {
+    if (!me) { $('gate').hidden = false; return; }
+    if (!song || !/^[\w-]{11}$/.test(song.id)) return;
+    if (inMix(song.id)) { notes.push({ts: Date.now(), text: '“' + song.t + '” is already in Tonight\'s Mix.', ok: false}); drawChat(); return; }
+    if (canEditMix()) { mixCmd({op: 'add', song}); return; }
+    const open = openVoteNow('add', song.id);
+    if (open) { castVote(open, true); return; }
+    if (!mq || !mq.connected || !me.nick) return;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const msg = await signed({type: 'chat', id, text: '!add', song, nick: me.nick, ts: Date.now()});
+    chatIn(msg);
+    mq.publish(T.chat, msg);
+    mq.publish(logTopic(me.sub, id), msg, {retain: true, qos: 1});
+    $('msgs').scrollTop = $('msgs').scrollHeight;
+  }
+  $('addNow').addEventListener('click', () => addToMix(songNow()));
+  $('mixFresh').addEventListener('click', () => {
+    if (!me || !me.owner) return;
+    if (!confirm('Start a fresh Tonight\'s Mix? This one is cleared for everyone. Save it first if you want to keep it.')) return;
+    mixCmd({op: 'clear'});
+  });
+
+  // ---- Saving mixes. A saved mix is just a link: the songs are packed into it (compressed), so it never expires.
+  const MIXES_KEY = 'aux-mixes';
+  async function packMix(m) {
+    const z = new Blob([JSON.stringify(m)]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    return b64u(await new Response(z).arrayBuffer());
+  }
+  async function unpackMix(s) {
+    const z = new Blob([unb64u(s)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const m = JSON.parse(await new Response(z).text());
+    if (!m || m.v !== 1 || !Array.isArray(m.s)) throw new Error('bad mix');
+    m.s = m.s.filter(x => Array.isArray(x) && /^[\w-]{11}$/.test(x[0])).slice(0, 200);
+    return m;
+  }
+  const mixLink = data => location.origin + location.pathname.replace(/[^/]*$/, '') + 'mix.html#' + data;
+  const ytParts = ids => { const out = []; for (let i = 0; i < ids.length; i += 50) out.push({from: i + 1, to: Math.min(ids.length, i + 50), url: 'https://www.youtube.com/watch_videos?video_ids=' + ids.slice(i, i + 50).join(',')}); return out; };
+  function myMixes() { try { const a = JSON.parse(localStorage.getItem(MIXES_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (_) { return []; } }
+  function keepMix(entry) {
+    try {
+      const all = myMixes().filter(x => x.data !== entry.data);
+      all.unshift(entry);
+      localStorage.setItem(MIXES_KEY, JSON.stringify(all.slice(0, 100)));
+      return true;
+    } catch (_) { return false; }
+  }
+  function ytButtons(box, ids) {
+    box.replaceChildren();
+    const parts = ytParts(ids);
+    parts.forEach(p => {
+      const a = document.createElement('a'); a.className = 'sbtn hot'; a.href = p.url; a.target = '_blank'; a.rel = 'noopener';
+      a.style.display = 'inline-flex'; a.style.alignItems = 'center'; a.style.textDecoration = 'none';
+      a.textContent = parts.length > 1 ? 'Save to YouTube Music · songs ' + p.from + '–' + p.to : 'Save to YouTube Music';
+      box.append(a);
+    });
+  }
+  const defaultMixName = () => 'Tonight\'s Mix · ' + new Date().toLocaleDateString([], {month: 'short', day: 'numeric', year: 'numeric'});
+  $('mixSave').addEventListener('click', () => {
+    const items = mix && Array.isArray(mix.items) ? mix.items : [];
+    if (!items.length) return;
+    $('svTitle').textContent = 'Save this mix';
+    $('svSub').textContent = items.length + (items.length === 1 ? ' song' : ' songs') + '. You get a link that never expires, and you can put it in YouTube Music.';
+    $('svName').value = defaultMixName(); $('svName').disabled = false;
+    $('svDone').hidden = true; $('svGo').hidden = false;
+    $('saveModal').hidden = false; $('svName').select();
+  });
+  $('saveForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const items = mix && Array.isArray(mix.items) ? mix.items : [];
+    if (!items.length) return;
+    const name = $('svName').value.replace(/\s+/g, ' ').trim().slice(0, 60) || defaultMixName();
+    const m = {v: 1, n: name, r: room, d: Date.now(), s: items.map(x => [x.id, x.t || '', x.a || '', x.len || 0])};
+    const data = await packMix(m);
+    const link = mixLink(data);
+    keepMix({n: name, d: m.d, c: m.s.length, r: room, data});
+    $('svLink').value = link; $('svName').disabled = true;
+    ytButtons($('svYt'), m.s.map(x => x[0]));
+    $('svDone').hidden = false; $('svGo').hidden = true;
+  });
+  $('svCopy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('svLink').value); $('svCopy').textContent = 'Copied'; }
+    catch (_) { $('svLink').select(); document.execCommand('copy'); $('svCopy').textContent = 'Copied'; }
+    setTimeout(() => { $('svCopy').textContent = 'Copy link'; }, 1600);
+  });
+  $('svOpen').addEventListener('click', () => window.open($('svLink').value, '_blank', 'noopener'));
+  $('svClose').addEventListener('click', () => { $('saveModal').hidden = true; });
+  // ---- My mixes (saved on this device) and playing one in the room
+  async function playMixInRoom(entry) {
+    if (!canEditMix()) return;
+    let m; try { m = await unpackMix(entry.data); } catch (_) { return; }
+    if (!confirm('Play “' + m.n + '” on the TV now? It replaces what\'s queued (requests still play first).')) return;
+    await mixCmd({op: 'play', name: m.n, items: m.s.map(x => ({id: x[0], t: String(x[1]).slice(0, 120), a: String(x[2]).slice(0, 120), len: x[3] || 0}))});
+    clearTimeout(mixWait); mixWait = 0;   // the TV answers with a chat notice, not a mix update
+    $('mixesModal').hidden = true;
+  }
+  function drawMixes() {
+    const box = $('mixes'); box.replaceChildren();
+    const all = myMixes();
+    if (!all.length) { const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '12px'; e.textContent = 'Nothing saved yet. Hit “Save this mix” when the room has a good one going.'; box.append(e); return; }
+    all.forEach(x => {
+      const row = document.createElement('div'); row.className = 'mixrow';
+      const t = document.createElement('div');
+      const n = document.createElement('div'); n.className = 'n'; n.textContent = x.n;
+      const d = document.createElement('div'); d.className = 'd'; d.textContent = new Date(x.d).toLocaleDateString([], {month: 'short', day: 'numeric', year: 'numeric'}) + ' · ' + x.c + (x.c === 1 ? ' song' : ' songs');
+      t.append(n, d);
+      const b = document.createElement('div'); b.className = 'b';
+      const open = document.createElement('a'); open.className = 'sbtn'; open.href = mixLink(x.data); open.target = '_blank'; open.rel = 'noopener'; open.textContent = 'Open';
+      open.style.display = 'inline-flex'; open.style.alignItems = 'center'; open.style.textDecoration = 'none';
+      b.append(open);
+      if (canEditMix()) { const p = document.createElement('button'); p.type = 'button'; p.className = 'sbtn hot'; p.textContent = 'Play in room'; p.addEventListener('click', () => playMixInRoom(x)); b.append(p); }
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'sbtn'; del.textContent = 'Delete';
+      del.addEventListener('click', () => { if (!confirm('Delete “' + x.n + '” from this device? Anyone with the link can still open it.')) return; try { localStorage.setItem(MIXES_KEY, JSON.stringify(myMixes().filter(y => y.data !== x.data))); } catch (_) {} drawMixes(); });
+      b.append(del);
+      row.append(t, b); box.append(row);
+    });
+  }
+  $('mixMine').addEventListener('click', () => { drawMixes(); $('mixesModal').hidden = false; });
+  $('mxClose').addEventListener('click', () => { $('mixesModal').hidden = true; });
+  // A mix link opened into the room ("…/#room&mix=…"): offer to keep it, save it to YouTube, or play it.
+  async function openLinkedMix() {
+    if (!linkedMix) return;
+    history.replaceState(null, '', '#' + code);
+    let m; try { m = await unpackMix(linkedMix); } catch (_) { return; }
+    keepMix({n: m.n, d: m.d || Date.now(), c: m.s.length, r: m.r || room, data: linkedMix});
+    drawMixes(); $('mixesModal').hidden = false;
+    $('mxSub').textContent = '“' + m.n + '” is saved here now.' + (canEditMix() ? ' Hit Play in room to put it on the TV.' : ' The owner or an admin can play it on the TV.');
+  }
 
   // ------------------------------------------------------------ owner panel
   $('manage').addEventListener('click', () => {
@@ -1341,7 +1622,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const changed = !state || state.off || s.off || s.id !== state.id || !!s.playing !== !!state.playing;
     state = s;
     const jumped = !changed && Math.abs(expected() - before) > 3; // the TV skipped within the song
-    render(); drawTour(); if (changed) drawQueue();
+    render(); drawTour(); if (changed) { drawQueue(); drawMix(); }
     if (changed || jumped) hardSync();
   }
 
