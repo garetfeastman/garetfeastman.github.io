@@ -51,6 +51,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 
 .room { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 48px; align-items: center; }
 @media (max-width: 760px) { .room { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+.record-col { width: 100%; display: flex; flex-direction: column; gap: 10px; align-items: center; }
 .record { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; margin: 0 auto; }
 .record .disc {
   position: absolute; inset: 0; border-radius: 50%;
@@ -96,13 +97,19 @@ button[hidden] { display: none !important; }
 footer { color: var(--muted); font-size: 13px; }
 .spinner { position: absolute; inset: 0; }
 .label {
-  position: absolute; left: 50%; top: 50%; width: max(200px, 56%); aspect-ratio: 1;
-  transform: translate(-50%, -50%); border-radius: 18px; overflow: hidden;
-  background: #000; box-shadow: 0 12px 40px rgba(0,0,0,.6), 0 0 0 6px #0b0b10;
-  opacity: 0; pointer-events: none; transition: opacity .4s ease;
+  position: absolute; inset: 18%; border-radius: 50%; overflow: hidden; background: #000;
+  box-shadow: 0 0 0 6px #0b0b10; opacity: 0; pointer-events: none; transition: opacity .4s ease, border-radius .3s ease;
 }
 .joined .label { opacity: 1; pointer-events: auto; }
-.label > *, .label iframe { width: 100% !important; height: 100% !important; display: block; border: 0; }
+/* The video is 16:9; widen it so the artwork fills the round label. */
+.label > *, .label iframe { position: absolute; top: 0; left: -38.9%; width: 177.8% !important; height: 100% !important; display: block; border: 0; }
+.spindle { z-index: 2; }
+/* "Show the player": stop spinning and show the whole player (to press Skip on an ad). */
+.peek .spinner { animation: none; }
+.peek .label { border-radius: 14px; inset: 12%; }
+.peek .label > *, .peek .label iframe { left: 0; width: 100% !important; }
+.peek .spindle { display: none; }
+.peek-btn { align-self: center; }
 .chat { display: flex; flex-direction: column; gap: 10px; background: rgba(21,21,29,.72); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
 .chat-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 button.link { background: none; border: 0; padding: 0; color: var(--muted); font: 600 13px var(--body); text-transform: none; letter-spacing: 0; text-decoration: underline; cursor: pointer; }
@@ -141,14 +148,17 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
   </header>
 
   <main class="room">
+    <div class="record-col">
     <div class="record" id="record">
       <div class="spinner spin">
         <div class="disc"></div>
         <img id="art" alt="" hidden>
+        <!-- While listening, YouTube's player is the record's label: round, cropped to the artwork, spinning with the record. -->
+        <div class="label" id="label"><div id="yt"></div></div>
         <div class="spindle"></div>
       </div>
-      <!-- YouTube's player sits in the middle of the record while listening (tap Skip here if an ad plays). -->
-      <div class="label" id="label"><div id="yt"></div></div>
+    </div>
+    <button type="button" class="link peek-btn" id="peek" hidden>Ad playing? Show the player</button>
     </div>
     <section class="info" aria-live="polite">
       <div class="eyebrow" id="eyebrow">Waiting for the TV</div>
@@ -423,14 +433,18 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
   document.head.appendChild(yt);
 
   $('join').addEventListener('click', () => {
-    joined = true; document.body.classList.add('joined');
+    joined = true; document.body.classList.add('joined'); $('peek').hidden = false;
     $('join').hidden = true; $('leave').hidden = false;
     $('status').textContent = state && !state.off ? 'Listening along.' : 'Joined. Music starts when the TV plays something.';
     if (ready) { player.unMute(); player.setVolume(Number($('volume').value)); }
     loadedId = ''; sync(true);
   });
+  $('peek').addEventListener('click', () => {
+    const on = document.body.classList.toggle('peek');
+    $('peek').textContent = on ? 'Back to the record' : 'Ad playing? Show the player';
+  });
   $('leave').addEventListener('click', () => {
-    joined = false; loadedId = ''; document.body.classList.remove('joined');
+    joined = false; loadedId = ''; document.body.classList.remove('joined', 'peek'); $('peek').hidden = true; $('peek').textContent = 'Ad playing? Show the player';
     if (ready) player.stopVideo();
     $('join').hidden = false; $('leave').hidden = true;
     $('status').textContent = 'Stopped. Press Join to listen again.';
