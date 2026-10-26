@@ -115,6 +115,20 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
 .chat-form input { flex: 1 1 140px; min-width: 0; font: 16px var(--body); color: var(--ink); background: var(--night); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; }
 .chat-form #chatName { flex: 0 1 140px; }
 .chat-form button { padding: 11px 20px; }
+.tour[hidden] { display: none; }
+.tour { display: flex; flex-direction: column; gap: 8px; }
+.tour-head { display: flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 14px; }
+.tour-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.show { flex: 0 0 auto; display: flex; gap: 12px; align-items: center; min-width: 210px; max-width: 260px; padding: 10px 14px; border-radius: 14px;
+  background: rgba(21,21,29,.72); border: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.show:hover, .show:focus-visible { border-color: var(--aux); }
+.show .d { display: flex; flex-direction: column; align-items: center; min-width: 44px; line-height: 1.1; }
+.show .d b { color: var(--aux); font-size: 12px; letter-spacing: .1em; }
+.show .d strong { font-size: 24px; }
+.show .w { min-width: 0; }
+.show .w div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.show .w .c { font-weight: 700; }
+.show .w .v { color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body class="paused">
@@ -147,6 +161,10 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
         <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
       </div>
       <div class="status" id="status">Press Join to hear it here, in sync with the TV.</div>
+      <div class="tour" id="tour" hidden>
+        <div class="tour-head"><span class="eyebrow">On tour</span><span id="tourArtist"></span></div>
+        <div class="tour-list" id="tourList"></div>
+      </div>
       <div class="chat" id="chat">
         <div class="chat-head"><span>Chat</span><button type="button" class="link" id="rename" hidden></button></div>
         <div class="msgs" id="msgs" aria-live="polite"><div class="empty" id="noMsgs">No messages yet. Say hi.</div></div>
@@ -262,7 +280,7 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     // Network delay estimate. Device clocks can differ, so keep it small and sane.
     lag = age > 0 && age < 8000 ? Math.min(1.5, age / 1000) : 0.3;
     const jumped = !changed && Math.abs(expected() - before) > 4;
-    render(); sync(changed || jumped);
+    render(); sync(changed || jumped); drawTour();
   }
 
   // ---- Chat: everyone on this link. Messages go over the same live channel; the latest ~40 are kept for people who join later.
@@ -321,6 +339,36 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     $('msgs').scrollTop = $('msgs').scrollHeight;
   });
 
+  // ---- Upcoming shows for the artist that's playing (the TV looks them up and sends them).
+  let tour = null;
+  const normName = x => String(x || '').toLowerCase().replace(/&/g, 'and').replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
+  function tourIn(raw) {
+    try { tour = JSON.parse(raw); } catch (_) { return; }
+    drawTour();
+  }
+  function drawTour() {
+    const box = $('tour');
+    const playing = state && !state.off ? normName(state.a) : '';
+    if (!tour || !Array.isArray(tour.shows) || !tour.shows.length || !playing || !playing.startsWith(normName(tour.artist))) { box.hidden = true; return; }
+    $('tourArtist').textContent = tour.artist;
+    const list = $('tourList'); list.replaceChildren();
+    for (const sh of tour.shows) {
+      const a = document.createElement('a'); a.className = 'show';
+      if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
+      const dt = new Date(String(sh.d) + 'T12:00:00');
+      const d = document.createElement('div'); d.className = 'd';
+      const mo = document.createElement('b'); mo.textContent = isNaN(dt) ? '' : dt.toLocaleDateString('en-US', {month: 'short'}).toUpperCase();
+      const dy = document.createElement('strong'); dy.textContent = isNaN(dt) ? String(sh.d || '') : String(dt.getDate());
+      d.append(mo, dy);
+      const w = document.createElement('div'); w.className = 'w';
+      const c = document.createElement('div'); c.className = 'c'; c.textContent = sh.c || '';
+      const v = document.createElement('div'); v.className = 'v'; v.textContent = (sh.v || '') + (sh.s === 'offsale' ? ' · off sale' : '');
+      w.append(c, v);
+      a.append(d, w); list.append(a);
+    }
+    box.hidden = false;
+  }
+
   // Live updates from the TV. Main: an MQTT channel that keeps the latest state for late joiners.
   // Backup: ntfy.sh (song changes and play/pause only).
   function connect() {
@@ -331,9 +379,10 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
       try {
         const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
         mq = c;
-        c.on('connect', () => { c.subscribe(['auxtogether/' + room, chatTopic, chatTopic + '/h']); if (!state) $('liveText').textContent = 'Waiting'; });
+        c.on('connect', () => { c.subscribe(['auxtogether/' + room, chatTopic, chatTopic + '/h', 'auxtour/' + room]); if (!state) $('liveText').textContent = 'Waiting'; });
         c.on('message', (t, p) => {
           if (t === chatTopic) chatIn(p.toString(), true);
+          else if (t === 'auxtour/' + room) tourIn(p.toString());
           else if (t === chatTopic + '/h') { try { (JSON.parse(p.toString()) || []).forEach(m => chatIn(m, false)); } catch (_) {} }
           else receive(p.toString());
         });
