@@ -5,238 +5,581 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AUX Together</title>
 <meta name="description" content="Listen along with what's playing on AUX, in sync.">
+<meta name="theme-color" content="#080808">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap">
 <style>
-/* Layout: one room — the record on the left, the song and controls on the right; stacks on phones. */
+/* Looks like AUX on the TV: black, big type, red accent, full window. */
 :root {
-  --night: #0b0b10;
-  --panel: #15151d;
-  --line: #2a2a36;
-  --ink: #f4f2f7;
-  --muted: #a3a1ad;
-  --aux: #ff3b6b;
-  --glow: #7a5cff;
-  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
-  --body: "Manrope", "Segoe UI", system-ui, sans-serif;
+  --night: #080808;
+  --panel: rgba(20, 20, 24, .72);
+  --panel-solid: #141418;
+  --line: rgba(255, 255, 255, .12);
+  --ink: #ffffff;
+  --soft: #e6e6e6;
+  --muted: #9a9a9a;
+  --aux: #ff4e6a;
+  --gold: #f5c451;
+  --admin: #7aa2ff;
+  --font: "Roboto", "Segoe UI", system-ui, sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; }
-body {
-  background: var(--night);
-  color: var(--ink);
-  font: 16px/1.5 var(--body);
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: max(24px, env(safe-area-inset-top, 0px)) 40px;
-}
-#backdrop {
-  position: fixed; inset: -10%; z-index: -1; pointer-events: none;
-  background-size: cover; background-position: center;
-  filter: blur(60px) saturate(1.3) brightness(.35);
-  opacity: 0; transition: opacity 1.2s ease;
-}
+html, body { margin: 0; height: 100%; }
+body { background: var(--night); color: var(--ink); font: 16px/1.45 var(--font); overflow: hidden; }
+button, input, select { font: inherit; color: inherit; }
+#backdrop { position: fixed; inset: -8%; z-index: -2; background-size: cover; background-position: center; filter: blur(70px) saturate(1.25) brightness(.32); opacity: 0; transition: opacity 1.2s ease; }
 #backdrop.on { opacity: 1; }
-.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.brand { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: .02em; }
-.brand b { color: var(--aux); }
-.head-right { display: flex; align-items: center; gap: 14px; }
-button.share { padding: 8px 18px; font-size: 14px; }
-button.share.done { border-color: var(--aux); color: var(--aux); }
-.live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-.live[data-state="live"] .dot { background: var(--aux); box-shadow: 0 0 0 0 var(--aux); animation: pulse 1.8s infinite; }
-.live[data-state="live"] { color: var(--ink); }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,59,107,.6); } 100% { box-shadow: 0 0 0 12px rgba(255,59,107,0); } }
+#shade { position: fixed; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(0,0,0,.55), rgba(0,0,0,.72) 55%, rgba(0,0,0,.9)); }
 
-.room { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 48px; align-items: center; }
-@media (max-width: 760px) { .room { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
-.record-col { width: 100%; display: flex; flex-direction: column; gap: 10px; align-items: center; }
-.record { position: relative; width: 100%; max-width: 420px; aspect-ratio: 1; margin: 0 auto; }
-.record .disc {
-  position: absolute; inset: 0; border-radius: 50%;
-  background: repeating-radial-gradient(circle at 50% 50%, #111 0 2px, #1a1a22 2px 4px);
-  box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 0 0 1px var(--line);
-}
-.record img[hidden] { display: none; }
-.record img {
-  position: absolute; inset: 18%; width: 64%; height: 64%; border-radius: 50%; object-fit: cover;
-  box-shadow: 0 0 0 6px #0b0b10;
-}
-.record .spindle { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--night); box-shadow: inset 0 0 0 2px var(--line); }
+.app { height: 100dvh; display: grid; grid-template-rows: auto 1fr; padding: 0 max(28px, env(safe-area-inset-right)) 0 max(28px, env(safe-area-inset-left)); }
+
+/* Top bar (like the TV's) */
+.top { display: flex; align-items: center; gap: 12px; padding: 22px 0 10px; min-width: 0; }
+.brand { font-weight: 900; font-size: 24px; letter-spacing: .02em; margin-right: 10px; white-space: nowrap; }
+.brand b { color: var(--aux); }
+.spacer { flex: 1; }
+.pill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 999px; border: 0; background: #1e1e24; color: var(--ink); font-size: 16px; cursor: pointer; white-space: nowrap; }
+.pill:hover { background: #2a2a32; }
+.pill:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.pill.done { color: var(--aux); }
+.pill[hidden] { display: none; }
+.live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.live[data-state="live"] { color: var(--ink); }
+.live[data-state="live"] .dot { background: var(--aux); animation: pulse 1.8s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,78,106,.6); } 100% { box-shadow: 0 0 0 12px rgba(255,78,106,0); } }
+.clock { font-weight: 300; font-size: 22px; color: rgba(255,255,255,.8); margin-left: 6px; }
+.me { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 6px 0 6px; border-radius: 999px; background: #1e1e24; border: 0; cursor: pointer; }
+.me img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #333; }
+.me span { padding-right: 10px; font-size: 14px; color: var(--soft); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me[hidden] { display: none; }
+
+/* Main: record | song | chat */
+.room { min-height: 0; display: grid; grid-template-columns: minmax(0, 46vh) minmax(0, 1fr) minmax(300px, 400px); gap: 40px; align-items: stretch; padding: 6px 0 26px; }
+.left { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 0; padding-top: 34px; }
+.record { position: relative; width: 100%; aspect-ratio: 1; }
+.middle { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 22px; }
+.spinner { position: absolute; inset: 0; }
+.disc { position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, #0d0d0f 0 2px, #18181d 2px 4px); box-shadow: 0 30px 80px rgba(0,0,0,.65), inset 0 0 0 1px var(--line); }
+#art { position: absolute; inset: 18%; width: 64%; height: 64%; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 6px #0b0b10; }
+#art[hidden] { display: none; }
+.label { position: absolute; inset: 18%; border-radius: 50%; overflow: hidden; background: #000; box-shadow: 0 0 0 6px #0b0b10; opacity: 0; pointer-events: none; transition: opacity .4s ease; }
+.joined .label { opacity: 1; pointer-events: auto; }
+.label > *, .label iframe { position: absolute; top: 0; left: -38.9%; width: 177.8% !important; height: 100% !important; display: block; border: 0; }
+.spindle { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--night); box-shadow: inset 0 0 0 2px var(--line); z-index: 2; }
 .spin { animation: spin 7s linear infinite; }
 .paused .spin { animation-play-state: paused; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .live[data-state="live"] .dot { animation: none; } }
-
-.info { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.eyebrow { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--aux); font-weight: 700; }
-h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 5vw, 52px); line-height: 1.05; margin: 0; text-wrap: balance; overflow-wrap: anywhere; }
-.artist { font-size: clamp(18px, 2.4vw, 24px); color: var(--ink); font-weight: 600; margin: 0; }
-.album { color: var(--muted); margin: 0; }
-.time { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
-.bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
-.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--glow), var(--aux)); border-radius: 3px; }
-.controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-button {
-  font: 700 16px var(--body); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 999px; padding: 14px 26px; cursor: pointer;
-}
-button.primary { background: var(--aux); border-color: var(--aux); color: #fff; }
-button:focus-visible, input:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
-button[hidden] { display: none !important; }
-.vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
-.vol input { width: 140px; accent-color: var(--aux); }
-.status { color: var(--muted); font-size: 15px; min-height: 1.5em; }
-.status a { color: var(--ink); }
-.player { display: flex; flex-direction: column; gap: 8px; }
-.player .frame { width: 320px; max-width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); }
-.player .frame > * { width: 100%; height: 100%; }
-.player small { color: var(--muted); }
-.empty { color: var(--muted); }
-footer { color: var(--muted); font-size: 13px; }
-.spinner { position: absolute; inset: 0; }
-.label {
-  position: absolute; inset: 18%; border-radius: 50%; overflow: hidden; background: #000;
-  box-shadow: 0 0 0 6px #0b0b10; opacity: 0; pointer-events: none; transition: opacity .4s ease, border-radius .3s ease;
-}
-.joined .label { opacity: 1; pointer-events: auto; }
-/* The video is 16:9; widen it so the artwork fills the round label. */
-.label > *, .label iframe { position: absolute; top: 0; left: -38.9%; width: 177.8% !important; height: 100% !important; display: block; border: 0; }
-.spindle { z-index: 2; }
-/* "Show the player": stop spinning and show the whole player (to press Skip on an ad). */
 .peek .spinner { animation: none; }
 .peek .label { border-radius: 14px; inset: 12%; }
 .peek .label > *, .peek .label iframe { left: 0; width: 100% !important; }
 .peek .spindle { display: none; }
-.peek-btn { align-self: center; }
-.chat { display: flex; flex-direction: column; gap: 10px; background: rgba(21,21,29,.72); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
-.chat-head { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-button.link { background: none; border: 0; padding: 0; color: var(--muted); font: 600 13px var(--body); text-transform: none; letter-spacing: 0; text-decoration: underline; cursor: pointer; }
-.msgs { height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; overscroll-behavior: contain; }
-.msg { line-height: 1.35; overflow-wrap: anywhere; }
-.msg b { color: var(--aux); font-weight: 700; margin-right: 6px; }
-.msg.me b { color: var(--glow); }
-.msg time { color: var(--muted); font-size: 12px; margin-left: 6px; }
-.chat-form { display: flex; gap: 8px; flex-wrap: wrap; }
-.chat-form input { flex: 1 1 140px; min-width: 0; font: 16px var(--body); color: var(--ink); background: var(--night); border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; }
-.chat-form #chatName { flex: 0 1 140px; }
-.chat-form button { padding: 11px 20px; }
-.tour[hidden] { display: none; }
-.tour { display: flex; flex-direction: column; gap: 8px; }
-.tour-head { display: flex; gap: 10px; align-items: baseline; color: var(--muted); font-size: 14px; }
-.tour-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
-.show { flex: 0 0 auto; display: flex; gap: 12px; align-items: center; min-width: 210px; max-width: 260px; padding: 10px 14px; border-radius: 14px;
-  background: rgba(21,21,29,.72); border: 1px solid var(--line); color: var(--ink); text-decoration: none; }
-.show:hover, .show:focus-visible { border-color: var(--aux); }
-.show .d { display: flex; flex-direction: column; align-items: center; min-width: 44px; line-height: 1.1; }
-.show .d b { color: var(--aux); font-size: 12px; letter-spacing: .1em; }
-.show .d strong { font-size: 24px; }
-.show .w { min-width: 0; }
-.show .w div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.show .w .c { font-weight: 700; }
-.show .w .v { color: var(--muted); font-size: 13px; }
-.tour .none { color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } .live[data-state="live"] .dot { animation: none; } }
+.link { background: none; border: 0; padding: 4px; color: var(--muted); font-size: 13px; text-decoration: underline; cursor: pointer; }
+.link[hidden] { display: none; }
+
+.info { display: flex; flex-direction: column; min-width: 0; }
+.eyebrow { font-size: 14px; font-weight: 500; letter-spacing: .18em; text-transform: uppercase; color: var(--aux); }
+h1 { font-size: clamp(34px, 4.6vw, 64px); line-height: 1.04; font-weight: 700; margin: 12px 0 8px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.artist { font-size: clamp(20px, 2.2vw, 28px); font-weight: 500; color: var(--soft); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.album { font-size: 19px; color: var(--muted); margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourline { margin-top: 14px; font-size: 15px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 22px; }
+.tourline b { color: var(--aux); letter-spacing: .12em; margin-right: 10px; }
+.tourline a { color: inherit; text-decoration: none; }
+.tourline a:hover { color: #fff; text-decoration: underline; }
+.tourline .d { color: #fff; font-weight: 500; margin-right: 6px; }
+.time { margin-top: 26px; }
+.bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: #fff; border-radius: 3px; }
+.times { display: flex; justify-content: space-between; color: #bdbdbd; font-size: 15px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 26px; }
+.big { height: 52px; padding: 0 30px; border-radius: 999px; border: 0; background: var(--aux); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; }
+.big.ghost { background: #1e1e24; font-weight: 500; }
+.big[hidden] { display: none; }
+.vol { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
+.vol input { width: 140px; accent-color: #fff; }
+.status { margin-top: 16px; color: var(--muted); font-size: 15px; min-height: 22px; }
+.status a { color: #fff; }
+
+/* Chat */
+.chat { flex: 1; min-height: 220px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; backdrop-filter: blur(10px); }
+.chat-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 10px; font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.msgs { flex: 1; overflow-y: auto; padding: 4px 18px 10px; display: flex; flex-direction: column; gap: 12px; overscroll-behavior: contain; }
+.msg { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.msg img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #333; }
+.msg .who { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.msg .who time { font-weight: 400; color: var(--muted); font-size: 12px; }
+.badge { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; font-weight: 700; }
+.r-owner .who > span:first-child, .r-owner .badge { color: var(--gold); }
+.r-admin .who > span:first-child, .r-admin .badge { color: var(--admin); }
+.msg .text { color: var(--soft); overflow-wrap: anywhere; font-size: 15px; }
+.msg .text.req { color: #fff; }
+.msg .text.req::before { content: "♪ "; color: var(--aux); }
+.sys { font-size: 13px; color: var(--muted); text-align: center; padding: 2px 6px; }
+.sys.ok { color: #9ee6a8; }
+.empty { color: var(--muted); font-size: 14px; }
+.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.chat-form input { flex: 1; min-width: 0; font-size: 16px; background: #0c0c10; border: 1px solid var(--line); border-radius: 999px; padding: 11px 16px; }
+.chat-form button { height: 44px; padding: 0 18px; border-radius: 999px; border: 0; background: var(--aux); color: #fff; font-weight: 700; cursor: pointer; }
+.hint { padding: 0 18px 10px; font-size: 12px; color: var(--muted); }
+
+/* Up next */
+.queue { min-height: 0; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; backdrop-filter: blur(10px); }
+.qlist { flex: 1; overflow-y: auto; padding: 0 10px 10px; overscroll-behavior: contain; }
+.qrow { display: grid; grid-template-columns: 22px 48px 1fr auto; gap: 12px; align-items: center; padding: 8px; border-radius: 12px; }
+.qrow:hover { background: rgba(255,255,255,.04); }
+.qrow .n { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.qrow img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #222; }
+.qrow .tt { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qrow .aa { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qrow .len { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.qrow.req .tt::after { content: " · requested"; color: var(--aux); font-weight: 400; font-size: 12px; }
+.qrow.first { background: rgba(255,78,106,.10); }
+
+/* Sign-in screen */
+.gate { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(8,8,8,.86); backdrop-filter: blur(18px); padding: 24px; }
+.gate[hidden] { display: none; }
+.gate .card { width: min(440px, 100%); text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.gate .brand { font-size: 40px; margin: 0; }
+.gate p { color: var(--soft); margin: 0; font-size: 17px; }
+.gate small { color: var(--muted); font-size: 13px; max-width: 360px; }
+#gbtn { min-height: 44px; margin-top: 8px; }
+
+/* Owner panel */
+.modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0,0,0,.7); padding: 20px; }
+.modal[hidden] { display: none; }
+.sheet { width: min(620px, 100%); max-height: 84dvh; display: flex; flex-direction: column; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+.sheet h2 { margin: 0; padding: 20px 22px 6px; font-size: 22px; }
+.sheet .sub { padding: 0 22px 12px; color: var(--muted); font-size: 14px; }
+.people { overflow-y: auto; padding: 0 12px 8px; }
+.person { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 12px; }
+.person:hover { background: rgba(255,255,255,.04); }
+.person img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
+.person .n { font-weight: 500; }
+.person .e { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person select { background: #1e1e24; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.sheet .acts { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--line); }
+
+@media (max-width: 1100px) {
+  body { overflow: auto; }
+  .app { height: auto; min-height: 100dvh; padding: 0 16px; }
+  .room { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-bottom: 24px; }
+  .record { width: min(100%, 420px); }
+  .chat { height: 460px; flex: none; }
+  .queue { max-height: 560px; }
+  .left { padding-top: 0; }
+  .clock { display: none; }
+  .top { flex-wrap: wrap; padding-top: 16px; }
+}
+@media (max-width: 520px) {
+  .brand { font-size: 20px; }
+  .pill { padding: 0 14px; height: 38px; font-size: 14px; }
+  .me span { display: none; }
+}
 </style>
 </head>
 <body class="paused">
-<div id="backdrop"></div>
-<div class="wrap">
-  <header>
+<div id="backdrop"></div><div id="shade"></div>
+
+<div class="app">
+  <header class="top">
     <div class="brand"><b>AUX</b> Together</div>
-    <div class="head-right">
-      <div class="live" id="live" data-state="waiting"><span class="dot"></span><span id="liveText">Connecting…</span></div>
-      <button type="button" class="share" id="share" hidden>Share</button>
-    </div>
+    <div class="live" id="live" data-state="waiting"><span class="dot"></span><span id="liveText">Connecting…</span></div>
+    <div class="spacer"></div>
+    <button class="pill" id="share" type="button" hidden>Share</button>
+    <button class="pill" id="manage" type="button" hidden>Manage room</button>
+    <button class="me" id="me" type="button" hidden title="Sign out"><img id="meImg" alt=""><span id="meName"></span></button>
+    <span class="clock" id="clock"></span>
   </header>
 
   <main class="room">
-    <div class="record-col">
-    <div class="record" id="record">
-      <div class="spinner spin">
-        <div class="disc"></div>
-        <img id="art" alt="" hidden>
-        <!-- While listening, YouTube's player is the record's label: round, cropped to the artwork, spinning with the record. -->
-        <div class="label" id="label"><div id="yt"></div></div>
-        <div class="spindle"></div>
+    <section class="left">
+      <div class="record" id="record">
+        <div class="spinner spin">
+          <div class="disc"></div>
+          <img id="art" alt="" hidden>
+          <div class="label" id="label"><div id="yt"></div></div>
+          <div class="spindle"></div>
+        </div>
       </div>
-    </div>
-    <button type="button" class="link peek-btn" id="peek" hidden>Ad playing? Show the player</button>
-    </div>
+      <button type="button" class="link" id="peek" hidden>Ad playing? Show the player</button>
+    </section>
+
+    <div class="middle">
     <section class="info" aria-live="polite">
       <div class="eyebrow" id="eyebrow">Waiting for the TV</div>
       <h1 id="title">Nothing playing yet</h1>
       <p class="artist" id="artist"></p>
       <p class="album" id="album"></p>
-      <div class="time"><span id="cur">0:00</span><div class="bar"><i id="fill"></i></div><span id="dur">0:00</span></div>
+      <div class="tourline" id="tour"></div>
+      <div class="time">
+        <div class="bar"><i id="fill"></i></div>
+        <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+      </div>
       <div class="controls">
-        <button class="primary" id="join" type="button">Join and listen</button>
-        <button id="leave" type="button" hidden>Stop listening</button>
+        <button class="big" id="join" type="button">Join and listen</button>
+        <button class="big ghost" id="leave" type="button" hidden>Stop listening</button>
         <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="100" value="80"></label>
       </div>
       <div class="status" id="status">Press Join to hear it here, in sync with the TV.</div>
-      <div class="tour" id="tour" hidden>
-        <div class="tour-head"><span class="eyebrow">On tour</span><span id="tourArtist"></span></div>
-        <div class="tour-list" id="tourList"></div>
-      </div>
-      <div class="chat" id="chat">
-        <div class="chat-head"><span>Chat</span><button type="button" class="link" id="rename" hidden></button></div>
-        <div class="msgs" id="msgs" aria-live="polite"><div class="empty" id="noMsgs">No messages yet. Say hi.</div></div>
-        <form class="chat-form" id="chatForm" autocomplete="off">
-          <input id="chatName" placeholder="Your name" maxlength="24" aria-label="Your name">
-          <input id="chatText" placeholder="Message" maxlength="300" aria-label="Message">
-          <button type="submit" class="primary">Send</button>
-        </form>
-      </div>
     </section>
+
+    <aside class="chat" aria-label="Chat">
+      <div class="chat-head"><span>Chat</span><span id="roleNote"></span></div>
+      <div class="msgs" id="msgs"><div class="empty">No messages yet. Say hi.</div></div>
+      <div class="hint" id="hint" hidden>Admins can type <b>!request</b> and a song name to play it next.</div>
+      <form class="chat-form" id="chatForm" autocomplete="off">
+        <input id="chatText" placeholder="Message" maxlength="300" aria-label="Message">
+        <button type="submit">Send</button>
+      </form>
+    </aside>
+    </div>
+
+    <aside class="queue" aria-label="Up next">
+      <div class="chat-head"><span>Up next</span><span id="qCount"></span></div>
+      <div class="qlist" id="qlist"><div class="empty" style="padding:8px">The TV's queue shows up here.</div></div>
+    </aside>
   </main>
-  <footer id="foot"></footer>
 </div>
 
+<!-- Sign in to enter the room -->
+<div class="gate" id="gate">
+  <div class="card">
+    <div class="brand"><b>AUX</b> Together</div>
+    <p id="gateText">Sign in with Google to join the room.</p>
+    <div id="gbtn"></div>
+    <small>Your Google name and picture show next to your messages. Messages are signed, so nobody can post as you.</small>
+  </div>
+</div>
+
+<!-- Owner: who can do what -->
+<div class="modal" id="manageModal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="mTitle">
+    <h2 id="mTitle">Manage room</h2>
+    <div class="sub">Admins can request songs with <b>!request</b>. Everyone else is a listener.</div>
+    <div class="people" id="people"></div>
+    <div class="acts">
+      <button class="pill" type="button" id="mCancel">Cancel</button>
+      <button class="big" type="button" id="mSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
 <script>
 (() => {
+  'use strict';
+  // Google sign-in for this page (Google Cloud > Credentials > OAuth client ID, web, origin https://garetfeastman.github.io).
+  const CLIENT_ID = '465500541999-abfcrd1o42mun2lntnctveolo9q990m1.apps.googleusercontent.com';
+  // The owner: SHA-256 of the owner's Google email (the address itself isn't published here).
+  const OWNER_HASH = '09d2d148984ceb52637b3f137ba7443417bdfb4bda4aadfeb50369c607c6c99f';
+  const RANK = {listener: 0, admin: 1, owner: 2};
+
   window.addEventListener('hashchange', () => location.reload());
   const code = (location.hash || '').replace(/^#/, '').replace(/[^\w-]/g, '');
-  const topic = !code ? '' : code.startsWith('aux-') ? code : 'aux-' + code;
+  const room = code.replace(/^aux-/, '');
   const $ = id => document.getElementById(id);
   const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
-  let state = null, recvAt = 0, lag = 0, player = null, ready = false, joined = false, loadedId = '', blocked = '';
+  const enc = new TextEncoder();
+  const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+  const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  const sha = async data => crypto.subtle.digest('SHA-256', typeof data === 'string' ? enc.encode(data) : data);
 
-  if (!topic) {
-    $('title').textContent = 'This link is missing its code';
-    $('eyebrow').textContent = 'Ask for the link again';
-    $('status').textContent = 'Open the full link your friend sent (it ends with # and a short code).';
-    $('join').hidden = true;
+  setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); }, 1000);
+
+  if (!room) {
+    $('gate').hidden = false;
+    $('gateText').textContent = 'This link is missing its room code. Ask for the link again.';
     return;
   }
-  $('foot').textContent = 'Room ' + topic;
 
-  // Share: a short link to this room (phones get their share menu; computers copy it).
-  const roomLink = location.origin + '/#' + topic.replace(/^aux-/, '');
-  $('share').hidden = false;
-  $('share').addEventListener('click', async () => {
-    const done = text => { $('share').textContent = text; $('share').classList.add('done'); setTimeout(() => { $('share').textContent = 'Share'; $('share').classList.remove('done'); }, 2200); };
-    if (navigator.share && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-      try { await navigator.share({title: 'AUX Together', text: 'Listen along with me', url: roomLink}); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  // ------------------------------------------------------------ identity (Google + a signing key for this visit)
+  // Each visit makes a key pair; Google's sign-in token is tied to its public key (the token's "nonce").
+  // Every chat message is signed with the private key, which never leaves this browser.
+  let me = null; // {sub, email, name, picture, cert}
+  let keys = null, nonce = '';
+  const certs = new Map();   // jwt -> Promise<identity|null>
+  let jwks = null;
+  async function googleKeys() {
+    if (!jwks || Date.now() - jwks.t > 3600e3) {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/certs').then(r => r.json());
+      jwks = {t: Date.now(), keys: r.keys || []};
     }
-    try { await navigator.clipboard.writeText(roomLink); done('Link copied'); return; } catch (_) {}
-    const t = document.createElement('textarea'); t.value = roomLink; t.style.position = 'fixed'; t.style.opacity = '0';
-    document.body.append(t); t.select();
-    let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
-    t.remove();
-    if (ok) done('Link copied'); else window.prompt('Copy this link:', roomLink);
+    return jwks.keys;
+  }
+  function verifyCert(cert) {
+    if (!cert || typeof cert.jwt !== 'string' || typeof cert.pub !== 'string') return Promise.resolve(null);
+    const k = cert.jwt + '|' + cert.pub;
+    if (!certs.has(k)) certs.set(k, (async () => {
+      try {
+        const [h, p, s] = cert.jwt.split('.');
+        const head = JSON.parse(new TextDecoder().decode(unb64u(h)));
+        const pay = JSON.parse(new TextDecoder().decode(unb64u(p)));
+        const jwk = (await googleKeys()).find(x => x.kid === head.kid);
+        if (!jwk || head.alg !== 'RS256') return null;
+        const key = await crypto.subtle.importKey('jwk', jwk, {name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'}, false, ['verify']);
+        const ok = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, unb64u(s), enc.encode(h + '.' + p));
+        if (!ok) return null;
+        if (pay.aud !== CLIENT_ID || !/^(https:\/\/)?accounts\.google\.com$/.test(pay.iss)) return null;
+        if (!pay.email_verified) return null;
+        if (pay.nonce !== b64u(await sha(unb64u(cert.pub)))) return null;
+        if (Date.now() / 1000 - pay.iat > 7 * 86400) return null;
+        const pub = await crypto.subtle.importKey('spki', unb64u(cert.pub), {name: 'ECDSA', namedCurve: 'P-256'}, false, ['verify']);
+        const email = String(pay.email || '').toLowerCase();
+        return {sub: pay.sub, email, name: pay.name || pay.given_name || 'Someone', picture: pay.picture || '', pub, owner: hex(await sha(email)) === OWNER_HASH};
+      } catch (_) { return null; }
+    })());
+    return certs.get(k);
+  }
+  async function signed(body) {
+    const b = JSON.stringify(body);
+    const s = await crypto.subtle.sign({name: 'ECDSA', hash: 'SHA-256'}, keys.privateKey, enc.encode(b));
+    return JSON.stringify({v: 2, cert: me.cert, b, s: b64u(s)});
+  }
+  async function open(raw) {
+    let m; try { m = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (_) { return null; }
+    if (!m || m.v !== 2 || typeof m.b !== 'string' || typeof m.s !== 'string') return null;
+    const who = await verifyCert(m.cert);
+    if (!who) return null;
+    const ok = await crypto.subtle.verify({name: 'ECDSA', hash: 'SHA-256'}, who.pub, unb64u(m.s), enc.encode(m.b)).catch(() => false);
+    if (!ok) return null;
+    let body; try { body = JSON.parse(m.b); } catch (_) { return null; }
+    return {who, body, raw: m};
+  }
+
+  // ------------------------------------------------------------ roles (set by the owner, signed by the owner)
+  let roles = {}; let rolesTs = 0;
+  const roleOf = who => who.owner ? 'owner' : (roles[who.sub] && roles[who.sub].r === 'admin' ? 'admin' : 'listener');
+  async function rolesIn(raw) {
+    const m = await open(raw);
+    if (!m || !m.who.owner || m.body.type !== 'roles' || typeof m.body.roles !== 'object') return;
+    if (m.body.ts < rolesTs) return;
+    roles = m.body.roles || {}; rolesTs = m.body.ts;
+    drawChat(); showRole();
+  }
+
+  // ------------------------------------------------------------ sign in
+  async function startSignIn() {
+    if (!CLIENT_ID) { $('gateText').textContent = 'Sign-in is being set up. Check back in a few minutes.'; return; }
+    keys = await crypto.subtle.generateKey({name: 'ECDSA', namedCurve: 'P-256'}, false, ['sign', 'verify']);
+    const spki = await crypto.subtle.exportKey('spki', keys.publicKey);
+    const pub = b64u(spki);
+    nonce = b64u(await sha(spki));
+    const ready = () => {
+      google.accounts.id.initialize({client_id: CLIENT_ID, nonce, auto_select: true, cancel_on_tap_outside: false, callback: async res => {
+        const cert = {jwt: res.credential, pub};
+        const who = await verifyCert(cert);
+        if (!who) { $('gateText').textContent = "Couldn't confirm that sign-in. Please try again."; return; }
+        me = {sub: who.sub, email: who.email, name: who.name, picture: who.picture, owner: who.owner, cert};
+        signedIn();
+      }});
+      google.accounts.id.renderButton($('gbtn'), {theme: 'filled_black', size: 'large', shape: 'pill', text: 'signin_with'});
+      google.accounts.id.prompt();
+    };
+    if (window.google && google.accounts && google.accounts.id) ready();
+    else { const t = setInterval(() => { if (window.google && google.accounts && google.accounts.id) { clearInterval(t); ready(); } }, 100); }
+  }
+  function signedIn() {
+    $('gate').hidden = true;
+    $('me').hidden = false; $('meImg').src = me.picture; $('meName').textContent = me.name;
+    showRole();
+    sayHello();
+  }
+  $('me').addEventListener('click', () => {
+    if (!confirm('Sign out of AUX Together?')) return;
+    try { google.accounts.id.disableAutoSelect(); } catch (_) {}
+    location.reload();
+  });
+  function showRole() {
+    if (!me) return;
+    const r = roleOf(me);
+    $('roleNote').textContent = r === 'listener' ? '' : r;
+    $('roleNote').style.color = r === 'owner' ? 'var(--gold)' : 'var(--admin)';
+    $('hint').hidden = RANK[r] < 1;
+    $('manage').hidden = r !== 'owner';
+  }
+
+  // ------------------------------------------------------------ live channel
+  let mq = null;
+  const T = {state: 'auxtogether/' + room, tour: 'auxtour/' + room, chat: 'auxchat/' + room, hist: 'auxchat/' + room + '/h',
+             roles: 'auxroles/' + room, users: 'auxusers/' + room, tv: 'auxtv/' + room, queue: 'auxqueue/' + room};
+  function connect() {
+    const lib = document.createElement('script');
+    lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
+    lib.onload = () => {
+      const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
+      mq = c;
+      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
+      c.on('close', () => { $('liveText').textContent = 'Reconnecting…'; });
+      c.on('message', (t, p) => {
+        const s = p.toString();
+        if (t === T.state) receive(s);
+        else if (t === T.tour) tourIn(s);
+        else if (t === T.chat) chatIn(s);
+        else if (t === T.hist) { try { (JSON.parse(s) || []).forEach(chatIn); } catch (_) {} }
+        else if (t === T.roles) rolesIn(s);
+        else if (t.startsWith(T.users + '/')) userIn(s);
+        else if (t === T.tv) tvIn(s);
+        else if (t === T.queue) queueIn(s);
+      });
+    };
+    document.head.appendChild(lib);
+  }
+
+  // What's coming up on the TV.
+  let upNext = null;
+  const requested = new Set();
+  function queueIn(raw) {
+    let q; try { q = JSON.parse(raw); } catch (_) { return; }
+    if (!q || q.v !== 1 || !Array.isArray(q.items)) return;
+    if (upNext && q.ts < upNext.ts) return;
+    upNext = q; drawQueue();
+  }
+  function drawQueue() {
+    const box = $('qlist'); box.replaceChildren();
+    const items = upNext ? upNext.items.filter(x => x && x.id && (!state || x.id !== state.id)) : [];
+    $('qCount').textContent = items.length ? items.length + (items.length === 1 ? ' song' : ' songs') : '';
+    if (!items.length) { const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '8px'; e.textContent = upNext ? 'Nothing queued after this song.' : "The TV's queue shows up here."; box.append(e); return; }
+    items.forEach((it, i) => {
+      const row = document.createElement('div'); row.className = 'qrow' + (i === 0 ? ' first' : '') + (requested.has(it.id) || it.req ? ' req' : '');
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
+      const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer'; if (/^https:\/\//.test(it.art || '')) img.src = it.art;
+      const txt = document.createElement('div'); txt.style.minWidth = '0';
+      const tt = document.createElement('div'); tt.className = 'tt'; tt.textContent = it.t || 'Unknown song';
+      const aa = document.createElement('div'); aa.className = 'aa'; aa.textContent = it.a || '';
+      txt.append(tt, aa);
+      const len = document.createElement('span'); len.className = 'len'; len.textContent = it.len ? fmt(it.len) : '';
+      row.append(n, img, txt, len); box.append(row);
+    });
+  }
+
+  // People who've been in the room (for the owner's list).
+  const people = new Map();
+  async function userIn(raw) {
+    const m = await open(raw);
+    if (!m || m.body.type !== 'hello') return;
+    people.set(m.who.sub, {sub: m.who.sub, name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner, ts: m.body.ts});
+  }
+  async function sayHello() {
+    if (!me || !mq || !mq.connected) return;
+    mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', ts: Date.now()}), {retain: true});
+  }
+
+  // ------------------------------------------------------------ chat
+  const chat = new Map(); // key -> {who, body, el}
+  async function chatIn(raw) {
+    const m = await open(raw);
+    if (!m || m.body.type !== 'chat' || typeof m.body.text !== 'string') return;
+    const key = m.who.sub + ':' + m.body.id;
+    if (chat.has(key)) return;
+    chat.set(key, {who: m.who, body: m.body, raw: m.raw});
+    people.set(m.who.sub, Object.assign(people.get(m.who.sub) || {}, {sub: m.who.sub, name: m.who.name, email: m.who.email, picture: m.who.picture, owner: m.who.owner}));
+    drawChat();
+  }
+  const notes = [];
+  function tvIn(raw) {
+    let n; try { n = JSON.parse(raw); } catch (_) { return; }
+    if (!n || n.v !== 1 || typeof n.text !== 'string' || !n.ts) return;
+    if (notes.some(x => x.ts === n.ts && x.text === n.text)) return;
+    notes.push({ts: Number(n.ts), text: n.text.slice(0, 200), ok: !!n.ok});
+    if (n.id && n.ok) { requested.add(String(n.id)); drawQueue(); }
+    drawChat();
+  }
+  function drawChat() {
+    const box = $('msgs');
+    const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    const items = [...chat.values()].map(x => ({ts: x.body.ts, x})).concat(notes.map(n => ({ts: n.ts, n})))
+      .sort((a, b) => a.ts - b.ts).slice(-150);
+    box.replaceChildren();
+    if (!items.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No messages yet. Say hi.'; box.append(e); return; }
+    for (const it of items) {
+      if (it.n) { const d = document.createElement('div'); d.className = 'sys' + (it.n.ok ? ' ok' : ''); d.textContent = it.n.text; box.append(d); continue; }
+      const {who, body} = it.x;
+      const r = roleOf(who);
+      const row = document.createElement('div'); row.className = 'msg r-' + r;
+      const img = document.createElement('img'); img.alt = ''; img.src = who.picture; img.referrerPolicy = 'no-referrer';
+      const right = document.createElement('div');
+      const name = document.createElement('div'); name.className = 'who';
+      const nm = document.createElement('span'); nm.textContent = who.name; name.append(nm);
+      if (r !== 'listener') { const b = document.createElement('span'); b.className = 'badge'; b.textContent = r; name.append(b); }
+      const t = document.createElement('time'); t.textContent = new Date(body.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); name.append(t);
+      const text = document.createElement('div'); text.className = 'text';
+      const isReq = /^!request\s+\S/i.test(body.text);
+      if (isReq) { text.classList.add('req'); text.textContent = 'Requested: ' + body.text.replace(/^!request\s+/i, ''); }
+      else text.textContent = body.text;
+      right.append(name, text); row.append(img, right); box.append(row);
+    }
+    if (near) box.scrollTop = box.scrollHeight;
+  }
+  let lastSent = 0;
+  $('chatForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    if (!me) { $('gate').hidden = false; return; }
+    const text = $('chatText').value.trim().slice(0, 300);
+    if (!text || !mq || !mq.connected || Date.now() - lastSent < 700) return;
+    if (/^!request\b/i.test(text) && RANK[roleOf(me)] < 1) {
+      notes.push({ts: Date.now(), text: 'Only admins can request songs.', ok: false}); drawChat(); return;
+    }
+    if (/^!request\s*$/i.test(text)) { notes.push({ts: Date.now(), text: 'Type the song after !request, like: !request Mr. Brightside', ok: false}); drawChat(); return; }
+    lastSent = Date.now();
+    $('chatText').value = '';
+    const body = {type: 'chat', id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, ts: Date.now()};
+    const msg = await signed(body);
+    chatIn(msg);
+    mq.publish(T.chat, msg);
+    const recent = [...chat.values()].sort((a, b) => a.body.ts - b.body.ts).slice(-40).map(x => x.raw);
+    mq.publish(T.hist, JSON.stringify(recent), {retain: true});
+    $('msgs').scrollTop = $('msgs').scrollHeight;
   });
 
+  // ------------------------------------------------------------ owner panel
+  $('manage').addEventListener('click', () => {
+    const list = $('people'); list.replaceChildren();
+    const all = [...people.values()].sort((a, b) => (b.owner - a.owner) || String(a.name).localeCompare(b.name));
+    if (!all.length) { const e = document.createElement('div'); e.className = 'empty'; e.style.padding = '12px'; e.textContent = 'Nobody has joined yet. People show up here after they sign in.'; list.append(e); }
+    for (const p of all) {
+      const row = document.createElement('div'); row.className = 'person';
+      const img = document.createElement('img'); img.alt = ''; img.src = p.picture || ''; img.referrerPolicy = 'no-referrer';
+      const txt = document.createElement('div');
+      const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name;
+      const em = document.createElement('div'); em.className = 'e'; em.textContent = p.email;
+      txt.append(n, em);
+      let ctl;
+      if (p.owner) { ctl = document.createElement('span'); ctl.className = 'badge'; ctl.style.color = 'var(--gold)'; ctl.textContent = 'owner'; }
+      else {
+        ctl = document.createElement('select'); ctl.dataset.sub = p.sub; ctl.dataset.name = p.name;
+        for (const r of ['listener', 'admin']) { const o = document.createElement('option'); o.value = r; o.textContent = r[0].toUpperCase() + r.slice(1); ctl.append(o); }
+        ctl.value = roles[p.sub] && roles[p.sub].r === 'admin' ? 'admin' : 'listener';
+      }
+      row.append(img, txt, ctl); list.append(row);
+    }
+    $('manageModal').hidden = false;
+  });
+  $('mCancel').addEventListener('click', () => { $('manageModal').hidden = true; });
+  $('mSave').addEventListener('click', async () => {
+    if (!me || !me.owner || !mq) return;
+    const next = {};
+    for (const [sub, v] of Object.entries(roles)) if (v && v.r === 'admin') next[sub] = v;
+    document.querySelectorAll('#people select').forEach(s => {
+      if (s.value === 'admin') next[s.dataset.sub] = {r: 'admin', n: s.dataset.name}; else delete next[s.dataset.sub];
+    });
+    const msg = await signed({type: 'roles', roles: next, ts: Date.now()});
+    mq.publish(T.roles, msg, {retain: true});
+    rolesIn(msg);
+    $('manageModal').hidden = true;
+  });
+
+  // ------------------------------------------------------------ what's playing on the TV
+  let state = null, recvAt = 0, lag = 0, player = null, ready = false, joined = false, loadedId = '', blocked = '';
   function expected() {
     if (!state) return 0;
     let p = state.pos || 0;
     if (state.playing) p += lag + (Date.now() - recvAt) / 1000;
     return state.dur ? Math.min(p, state.dur) : p;
   }
-
   function render() {
     const live = $('live');
     if (!state || state.off) {
@@ -248,7 +591,7 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     }
     live.dataset.state = state.playing ? 'live' : 'waiting';
     $('liveText').textContent = state.playing ? 'Live' : 'Paused on the TV';
-    $('eyebrow').textContent = state.playing ? 'Now playing on the TV' : 'Paused on the TV';
+    $('eyebrow').textContent = state.playing ? 'Now playing' : 'Paused';
     $('title').textContent = state.t || 'Unknown song';
     $('artist').textContent = state.a || '';
     $('album').textContent = state.al || '';
@@ -260,7 +603,6 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     }
     document.body.classList.toggle('paused', !state.playing);
   }
-
   function tick() {
     if (state && !state.off) {
       const e = expected();
@@ -270,8 +612,6 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-
-  // Keep this device's player matching the TV.
   function sync(force) {
     if (!joined || !ready || !state) return;
     if (state.off) { player.pauseVideo(); return; }
@@ -286,8 +626,6 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     if (blocked) return;
     const ps = player.getPlayerState();
     if (state.playing) {
-      // Song finished here a moment before the TV moved on: wait for the TV's next song
-      // (don't restart this one from the beginning).
       if (ps === YT.PlayerState.ENDED || (state.dur && want >= state.dur - 1.5)) return;
       if (ps !== YT.PlayerState.PLAYING && ps !== YT.PlayerState.BUFFERING) player.playVideo();
       const cur = player.getCurrentTime() || 0;
@@ -298,142 +636,43 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     }
   }
   setInterval(() => sync(false), 2000);
-
   function receive(raw) {
     let s; try { s = JSON.parse(raw); } catch (_) { return; }
     if (!s || s.v !== 1) return;
-    if (state && s.ts && state.ts && s.ts < state.ts) return; // older than what we have
+    if (state && s.ts && state.ts && s.ts < state.ts) return;
     const age = Date.now() - (s.ts || Date.now());
-    if (age > 6 * 3600 * 1000) return; // stale from hours ago
-    // Only jump when something really changed (new song, play/pause, or the TV skipped within the song).
-    // The TV's regular check-ins shouldn't move playback here.
+    if (age > 6 * 3600 * 1000) return;
     const before = state ? expected() : 0;
     const changed = !state || state.off || s.off || s.id !== state.id || !!s.playing !== !!state.playing;
     state = s; recvAt = Date.now();
-    // Network delay estimate. Device clocks can differ, so keep it small and sane.
     lag = age > 0 && age < 8000 ? Math.min(1.5, age / 1000) : 0.3;
     const jumped = !changed && Math.abs(expected() - before) > 4;
-    render(); sync(changed || jumped); drawTour();
+    render(); sync(changed || jumped); drawTour(); if (changed) drawQueue();
   }
 
-  // ---- Chat: everyone on this link. Messages go over the same live channel; the latest ~40 are kept for people who join later.
-  let mq = null;
-  const chatTopic = 'auxchat/' + topic.replace(/^aux-/, '');
-  const chat = new Map();
-  const me = Math.random().toString(36).slice(2, 10);
-  let myName = ''; try { myName = localStorage.getItem('auxName') || ''; } catch (_) {}
-  function showName() {
-    $('chatName').style.display = myName ? 'none' : '';
-    $('rename').hidden = !myName;
-    $('rename').textContent = myName ? 'You are ' + myName + ' · change' : '';
-  }
-  showName();
-  $('rename').addEventListener('click', () => { myName = ''; showName(); $('chatName').focus(); });
-  function chatIn(raw, live) {
-    let m = raw; if (typeof raw === 'string') { try { m = JSON.parse(raw); } catch (_) { return; } }
-    if (!m || m.v !== 1 || !m.id || chat.has(m.id) || typeof m.m !== 'string') return;
-    m.n = String(m.n || 'Someone').slice(0, 24); m.m = m.m.slice(0, 300); m.ts = Number(m.ts) || Date.now();
-    chat.set(m.id, m);
-    drawChat();
-  }
-  function drawChat() {
-    const box = $('msgs');
-    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
-    const list = [...chat.values()].sort((a, b) => a.ts - b.ts).slice(-100);
-    box.replaceChildren();
-    if (!list.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No messages yet. Say hi.'; box.append(e); return; }
-    for (const m of list) {
-      const row = document.createElement('div'); row.className = 'msg' + (m.from === me ? ' me' : '');
-      const who = document.createElement('b'); who.textContent = m.n;
-      const text = document.createElement('span'); text.textContent = m.m;
-      const t = document.createElement('time'); t.textContent = new Date(m.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
-      row.append(who, text, t); box.append(row);
-    }
-    if (nearBottom) box.scrollTop = box.scrollHeight;
-  }
-  let lastSent = 0;
-  $('chatForm').addEventListener('submit', e => {
-    e.preventDefault();
-    if (!myName) {
-      const n = $('chatName').value.trim().slice(0, 24);
-      if (!n) { $('chatName').focus(); return; }
-      myName = n; try { localStorage.setItem('auxName', n); } catch (_) {}
-      showName();
-    }
-    const text = $('chatText').value.trim().slice(0, 300);
-    if (!text || !mq || !mq.connected || Date.now() - lastSent < 700) return;
-    lastSent = Date.now();
-    const m = {v: 1, id: me + '-' + Date.now().toString(36), from: me, n: myName, m: text, ts: Date.now()};
-    $('chatText').value = '';
-    chatIn(m, true);
-    mq.publish(chatTopic, JSON.stringify(m));
-    const recent = [...chat.values()].sort((a, b) => a.ts - b.ts).slice(-40);
-    mq.publish(chatTopic + '/h', JSON.stringify(recent), {retain: true});
-    $('msgs').scrollTop = $('msgs').scrollHeight;
-  });
-
-  // ---- Upcoming shows for the artist that's playing (the TV looks them up and sends them).
+  // Upcoming shows for the artist that's playing (the TV looks them up).
   let tour = null;
   const normName = x => String(x || '').toLowerCase().replace(/&/g, 'and').replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
-  function tourIn(raw) {
-    try { tour = JSON.parse(raw); } catch (_) { return; }
-    drawTour();
-  }
+  function tourIn(raw) { try { tour = JSON.parse(raw); } catch (_) { return; } drawTour(); }
   function drawTour() {
-    const box = $('tour');
+    const box = $('tour'); box.replaceChildren();
     const playing = state && !state.off ? normName(state.a) : '';
-    if (!tour || !Array.isArray(tour.shows) || !playing || !playing.startsWith(normName(tour.artist))) { box.hidden = true; return; }
-    $('tourArtist').textContent = tour.artist;
-    const list = $('tourList'); list.replaceChildren();
-    if (!tour.shows.length) {
-      const none = document.createElement('div'); none.className = 'none'; none.textContent = 'No upcoming tour dates right now.';
-      list.append(none); box.hidden = false; return;
-    }
-    for (const sh of tour.shows) {
-      const a = document.createElement('a'); a.className = 'show';
+    if (!tour || !Array.isArray(tour.shows) || !playing || !playing.startsWith(normName(tour.artist))) return;
+    if (!tour.shows.length) { box.textContent = 'No upcoming tour dates'; return; }
+    const b = document.createElement('b'); b.textContent = 'ON TOUR'; box.append(b);
+    tour.shows.slice(0, 3).forEach((sh, i) => {
+      if (i) box.append('  ·  ');
+      const a = document.createElement('a');
       if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
       const dt = new Date(String(sh.d) + 'T12:00:00');
-      const d = document.createElement('div'); d.className = 'd';
-      const mo = document.createElement('b'); mo.textContent = isNaN(dt) ? '' : dt.toLocaleDateString('en-US', {month: 'short'}).toUpperCase();
-      const dy = document.createElement('strong'); dy.textContent = isNaN(dt) ? String(sh.d || '') : String(dt.getDate());
-      d.append(mo, dy);
-      const w = document.createElement('div'); w.className = 'w';
-      const c = document.createElement('div'); c.className = 'c'; c.textContent = sh.c || '';
-      const v = document.createElement('div'); v.className = 'v'; v.textContent = (sh.v || '') + (sh.s === 'offsale' ? ' · off sale' : '');
-      w.append(c, v);
-      a.append(d, w); list.append(a);
-    }
-    box.hidden = false;
+      const d = document.createElement('span'); d.className = 'd'; d.textContent = isNaN(dt) ? sh.d : dt.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}).toUpperCase();
+      a.append(d, sh.c || '');
+      box.append(a);
+    });
+    if (tour.shows.length > 3) box.append('  +' + (tour.shows.length - 3) + ' more');
   }
 
-  // Live updates from the TV. Main: an MQTT channel that keeps the latest state for late joiners.
-  // Backup: ntfy.sh (song changes and play/pause only).
-  function connect() {
-    const room = topic.replace(/^aux-/, '');
-    const lib = document.createElement('script');
-    lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
-    lib.onload = () => {
-      try {
-        const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
-        mq = c;
-        c.on('connect', () => { c.subscribe(['auxtogether/' + room, chatTopic, chatTopic + '/h', 'auxtour/' + room]); if (!state) $('liveText').textContent = 'Waiting'; });
-        c.on('message', (t, p) => {
-          if (t === chatTopic) chatIn(p.toString(), true);
-          else if (t === 'auxtour/' + room) tourIn(p.toString());
-          else if (t === chatTopic + '/h') { try { (JSON.parse(p.toString()) || []).forEach(m => chatIn(m, false)); } catch (_) {} }
-          else receive(p.toString());
-        });
-      } catch (_) {}
-    };
-    document.head.appendChild(lib);
-    const es = new EventSource('https://ntfy.sh/' + topic + '/sse?since=2h');
-    es.onopen = () => { if (!state) $('liveText').textContent = 'Waiting'; };
-    es.onmessage = e => { try { const m = JSON.parse(e.data); if (m.event === 'message' && m.message) receive(m.message); } catch (_) {} };
-    es.onerror = () => { $('liveText').textContent = 'Reconnecting…'; };
-  }
-  connect();
-
-  // YouTube's own player plays the song on this device.
+  // ------------------------------------------------------------ YouTube's player (the record's label while listening)
   window.onYouTubeIframeAPIReady = () => {
     player = new YT.Player('yt', {
       width: '100%', height: '100%',
@@ -450,20 +689,15 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
       }
     });
   };
-  const yt = document.createElement('script');
-  yt.src = 'https://www.youtube.com/iframe_api';
-  document.head.appendChild(yt);
+  const yt = document.createElement('script'); yt.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(yt);
 
   $('join').addEventListener('click', () => {
+    if (!me) { $('gate').hidden = false; return; }
     joined = true; document.body.classList.add('joined'); $('peek').hidden = false;
     $('join').hidden = true; $('leave').hidden = false;
     $('status').textContent = state && !state.off ? 'Listening along.' : 'Joined. Music starts when the TV plays something.';
     if (ready) { player.unMute(); player.setVolume(Number($('volume').value)); }
     loadedId = ''; sync(true);
-  });
-  $('peek').addEventListener('click', () => {
-    const on = document.body.classList.toggle('peek');
-    $('peek').textContent = on ? 'Back to the record' : 'Ad playing? Show the player';
   });
   $('leave').addEventListener('click', () => {
     joined = false; loadedId = ''; document.body.classList.remove('joined', 'peek'); $('peek').hidden = true; $('peek').textContent = 'Ad playing? Show the player';
@@ -471,13 +705,30 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
     $('join').hidden = false; $('leave').hidden = true;
     $('status').textContent = 'Stopped. Press Join to listen again.';
   });
+  $('peek').addEventListener('click', () => {
+    const on = document.body.classList.toggle('peek');
+    $('peek').textContent = on ? 'Back to the record' : 'Ad playing? Show the player';
+  });
   const setVol = () => { if (!ready) return; const v = Number($('volume').value); if (v > 0) player.unMute(); player.setVolume(v); };
-  $('volume').addEventListener('input', setVol);
-  $('volume').addEventListener('change', setVol);
-  // Phones only let their own volume buttons change the sound: hide the slider there.
+  $('volume').addEventListener('input', setVol); $('volume').addEventListener('change', setVol);
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform))) {
-    const vl = document.querySelector('label.vol'); if (vl) vl.style.display = 'none';
+    document.querySelector('label.vol').style.display = 'none';
   }
+
+  // Share: a short link to this room.
+  const roomLink = location.origin + '/#' + room;
+  $('share').hidden = false;
+  $('share').addEventListener('click', async () => {
+    const done = t => { $('share').textContent = t; $('share').classList.add('done'); setTimeout(() => { $('share').textContent = 'Share'; $('share').classList.remove('done'); }, 2200); };
+    if (navigator.share && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
+      try { await navigator.share({title: 'AUX Together', text: 'Listen along with me', url: roomLink}); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(roomLink); done('Link copied'); return; } catch (_) {}
+    window.prompt('Copy this link:', roomLink);
+  });
+
+  connect();
+  startSignIn();
 })();
 </script>
 </body>
