@@ -37,8 +37,10 @@ button, input, select { font: inherit; color: inherit; }
 
 /* Top bar (like the TV's) */
 .top { display: flex; align-items: center; gap: 12px; padding: 22px 0 10px; min-width: 0; }
-.brand { font-weight: 900; font-size: 24px; letter-spacing: .02em; margin-right: 10px; white-space: nowrap; }
-.brand b { color: var(--aux); }
+.brand { font-weight: 900; font-size: 24px; letter-spacing: .02em; margin-right: 10px; white-space: nowrap; display: inline-flex; align-items: baseline; }
+/* The T of "Together" tucks just behind the X: a thin background-coloured edge on the X cuts the overlap. */
+.brand b { color: var(--aux); position: relative; z-index: 2; letter-spacing: .02em; text-shadow: .035em 0 0 var(--night), .06em 0 0 var(--night), .035em .02em 0 var(--night), .035em -.02em 0 var(--night); }
+.brand .tg { position: relative; z-index: 1; margin-left: -.2em; }
 .spacer { flex: 1; }
 .pill { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 999px; border: 0; background: #1e1e24; color: var(--ink); font-size: 16px; cursor: pointer; white-space: nowrap; }
 .pill:hover { background: #2a2a32; }
@@ -93,16 +95,18 @@ button, input, select { font: inherit; color: inherit; }
 h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; margin: 12px 0 8px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .artist { font-size: clamp(20px, 2.2vw, 28px); font-weight: 500; color: var(--soft); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .album { font-size: 19px; color: var(--muted); margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tourline { margin-top: 14px; font-size: 15px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 22px; }
-.tourline b { color: var(--aux); letter-spacing: .12em; margin-right: 10px; }
-.tourline .track { display: inline-block; white-space: nowrap; }
-.tourline.roll { -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 3%, #000 92%, transparent); }
+.tourline { margin-top: 14px; font-size: 15px; color: rgba(255,255,255,.7); display: flex; align-items: center; gap: 12px; min-height: 22px; }
+.tourline b { color: var(--aux); letter-spacing: .12em; flex: none; }
+.tourline .win { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+.tourline .track { display: inline-block; white-space: nowrap; will-change: transform; }
+.tourline.roll .win { -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 4%, #000 92%, transparent); }
 .tourline.roll .track { animation: tourroll var(--roll, 20s) linear infinite; }
-.tourline.roll:hover .track { animation-play-state: paused; }
-@keyframes tourroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .tourline.roll .track { animation: none; } }
-.tourline a { color: inherit; text-decoration: none; }
-.tourline a:hover { color: #fff; text-decoration: underline; }
+.tourline.roll .win:hover .track { animation-play-state: paused; }
+@keyframes tourroll { from { transform: translateX(0); } to { transform: translateX(var(--shift, -50%)); } }
+@media (prefers-reduced-motion: reduce) { .tourline.roll .track { animation: none; } .tourline .win { overflow-x: auto; } }
+.tourline a { color: inherit; text-decoration: none; cursor: pointer; padding: 2px 0; }
+.tourline a[href]:hover { color: #fff; text-decoration: underline; }
+.tourline .sep { opacity: .45; padding: 0 12px; }
 .tourline .d { color: #fff; font-weight: 500; margin-right: 6px; }
 .time { margin-top: 26px; }
 .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; }
@@ -222,7 +226,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 
 <div class="app">
   <header class="top">
-    <div class="brand"><b>AUX</b> Together</div>
+    <div class="brand" aria-label="AUX Together"><b>AUX</b><span class="tg">Together</span></div>
     <div class="live" id="live" data-state="waiting"><span class="dot"></span><span id="liveText">Connecting…</span></div>
     <div class="spacer"></div>
     <button class="pill" id="share" type="button" hidden>Share</button>
@@ -298,7 +302,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 <!-- Sign in to enter the room -->
 <div class="gate" id="gate">
   <div class="card">
-    <div class="brand"><b>AUX</b> Together</div>
+    <div class="brand" aria-label="AUX Together"><b>AUX</b><span class="tg">Together</span></div>
     <p id="gateText">Sign in with Google to join the room.</p>
     <div id="gbtn"></div>
     <small>You only sign in once on this device. You'll pick a nickname for the chat next. Messages are signed, so nobody can post as you.</small>
@@ -730,8 +734,16 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const h = document.createElement('div'); h.className = 'h'; h.textContent = nickOf(sub); pop.append(h);
     if (sub !== me.sub) {
       const w = document.createElement('button'); w.type = 'button'; w.textContent = '🔒  Whisper';
-      if (!p.dh) { w.disabled = true; w.title = 'They need to open the latest version of the page first.'; w.style.opacity = .5; }
-      w.addEventListener('click', () => { startWhisper(sub); hidePops(); });
+      if (!p.dh) w.style.opacity = .6;
+      w.addEventListener('click', () => {
+        hidePops();
+        const fresh = people.get(sub) || {};
+        if (!fresh.dh) {
+          notes.push({ts: Date.now(), text: nickOf(sub) + " can't get whispers yet. They need to refresh AUX Together (their page is an older version).", ok: false});
+          drawChat(); return;
+        }
+        startWhisper(sub);
+      });
       pop.append(w);
     }
     const m = document.createElement('button'); m.type = 'button'; m.textContent = '@  Mention';
@@ -1056,37 +1068,53 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   const normName = x => String(x || '').toLowerCase().replace(/&/g, 'and').replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
   function tourIn(raw) { try { tour = JSON.parse(raw); } catch (_) { return; } drawTour(); }
   function drawTour() {
-    const box = $('tour'); box.replaceChildren(); box.classList.remove('roll');
+    const box = $('tour');
     const playing = state && !state.off ? normName(state.a) : '';
-    if (!tour || !Array.isArray(tour.shows) || !playing || !playing.startsWith(normName(tour.artist))) return;
+    const show = !!(tour && Array.isArray(tour.shows) && playing && playing.startsWith(normName(tour.artist)));
+    const sig = show ? JSON.stringify(tour.shows.slice(0, 12)) : '';
+    if (sig === drawTour.sig) return;          // unchanged: don't restart the scroll
+    drawTour.sig = sig;
+    box.replaceChildren(); box.classList.remove('roll');
+    if (!show) return;
     if (!tour.shows.length) { box.textContent = 'No upcoming tour dates'; return; }
-    const b = document.createElement('b'); b.textContent = 'ON TOUR'; box.append(b);
-    // Every date in one line; if it doesn't fit, it scrolls (hover to pause).
+    const b = document.createElement('b'); b.textContent = 'ON TOUR';
+    const win = document.createElement('div'); win.className = 'win';
+    const track = document.createElement('span'); track.className = 'track';
+    win.append(track); box.append(b, win);
+    // Every date on one line, each a link to its tickets. If they don't fit, they scroll (hover to pause and click).
     const part = () => {
-      const span = document.createElement('span');
+      const frag = document.createDocumentFragment();
       tour.shows.slice(0, 12).forEach((sh, i) => {
-        if (i) span.append('  ·  ');
+        if (i) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '·'; frag.append(s); }
         const a = document.createElement('a');
-        if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
+        if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; a.title = 'Tickets: ' + [sh.v, sh.c].filter(Boolean).join(', '); }
         const dt = new Date(String(sh.d) + 'T12:00:00');
         const d = document.createElement('span'); d.className = 'd'; d.textContent = isNaN(dt) ? sh.d : dt.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}).toUpperCase();
-        a.append(d, sh.c || '');
-        span.append(a);
+        a.append(d, sh.c || sh.v || '');
+        frag.append(a);
       });
-      return span;
+      return frag;
     };
-    const track = document.createElement('span'); track.className = 'track';
     track.append(part());
-    box.append(track);
-    box.classList.remove('roll');
-    requestAnimationFrame(() => {
-      if (box.scrollWidth <= box.clientWidth + 2) return;
-      const gap = document.createElement('span'); gap.textContent = '      ·      ';
-      const copy = part();
-      track.append(gap, copy);
-      box.style.setProperty('--roll', Math.max(12, track.scrollWidth / 2 / 45) + 's');
+    const fit = () => {
+      if (!win.isConnected) return;
+      box.classList.remove('roll');
+      while (track.childNodes.length > track.dataset.n) track.lastChild.remove();
+      if (track.scrollWidth <= win.clientWidth + 2) return;
+      const one = track.scrollWidth;
+      const gap = document.createElement('span'); gap.className = 'sep'; gap.textContent = '·';
+      track.append(gap, part());
+      const shift = track.scrollWidth - one;   // exactly one copy plus its gap, so the loop is seamless
+      box.style.setProperty('--shift', -shift + 'px');
+      box.style.setProperty('--roll', Math.max(10, shift / 40) + 's');
       box.classList.add('roll');
-    });
+    };
+    track.dataset.n = track.childNodes.length;
+    requestAnimationFrame(fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => requestAnimationFrame(fit));
+    clearTimeout(drawTour.t); window.removeEventListener('resize', drawTour.r);
+    drawTour.r = () => { clearTimeout(drawTour.t); drawTour.t = setTimeout(fit, 200); };
+    window.addEventListener('resize', drawTour.r);
   }
 
   // ------------------------------------------------------------ YouTube's player (the record's label while listening)
