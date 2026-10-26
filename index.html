@@ -129,6 +129,7 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
 .show .w div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .show .w .c { font-weight: 700; }
 .show .w .v { color: var(--muted); font-size: 13px; }
+.tour .none { color: var(--muted); font-size: 14px; }
 </style>
 </head>
 <body class="paused">
@@ -349,9 +350,13 @@ button.link { background: none; border: 0; padding: 0; color: var(--muted); font
   function drawTour() {
     const box = $('tour');
     const playing = state && !state.off ? normName(state.a) : '';
-    if (!tour || !Array.isArray(tour.shows) || !tour.shows.length || !playing || !playing.startsWith(normName(tour.artist))) { box.hidden = true; return; }
+    if (!tour || !Array.isArray(tour.shows) || !playing || !playing.startsWith(normName(tour.artist))) { box.hidden = true; return; }
     $('tourArtist').textContent = tour.artist;
     const list = $('tourList'); list.replaceChildren();
+    if (!tour.shows.length) {
+      const none = document.createElement('div'); none.className = 'none'; none.textContent = 'No upcoming tour dates right now.';
+      list.append(none); box.hidden = false; return;
+    }
     for (const sh of tour.shows) {
       const a = document.createElement('a'); a.className = 'show';
       if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
