@@ -235,6 +235,21 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .person img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #333; }
 .person .n { font-weight: 500; }
 .person .e { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person .ctl { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.person .ctl label { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--soft); cursor: pointer; white-space: nowrap; }
+.person .ctl label[hidden] { display: none; }
+.person .ctl input { accent-color: var(--aux); width: 15px; height: 15px; }
+.msg .text.cmd { color: var(--muted); font-style: italic; }
+.vote { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid var(--line); max-width: 340px; }
+.vote.closed { opacity: .6; }
+.vote .vbar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; }
+.vote .vbar i { display: block; height: 100%; background: var(--aux); border-radius: 3px; transition: width .3s; }
+.vote .vline { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.vote .vbtns { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.vote .vbtns button { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: #1e1e24; color: var(--soft); cursor: pointer; font-size: 13px; font-weight: 600; }
+.vote .vbtns button:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+.vote .vbtns button.on { background: var(--aux); border-color: var(--aux); color: #fff; }
+.vote .vbtns .vleft { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .person select { background: #1e1e24; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
 .sheet .acts { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--line); }
 
@@ -367,7 +382,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 <div class="modal" id="manageModal" hidden>
   <div class="sheet" role="dialog" aria-labelledby="mTitle">
     <h2 id="mTitle">Manage room</h2>
-    <div class="sub">Admins' <b>!request</b> songs play right away. Listeners can request too; an admin or you approve them.</div>
+    <div class="sub">Admins' <b>!request</b> songs play right away. Listeners can request too; an admin or you approve them. You can always type <b>!pause</b> and <b>!play</b>; turn on <b>Pause / play</b> to let an admin do it too.</div>
     <div class="people" id="people"></div>
     <div class="acts">
       <button class="link" type="button" id="mPurge" style="margin-right:auto;color:#ff8a9b">Clear the chat log for everyone</button>
@@ -563,7 +578,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const r = roleOf(me);
     $('roleNote').replaceChildren(...(r === 'listener' ? [] : [roleIcon(r)]));
     $('hint').hidden = false;
-    $('hint').innerHTML = RANK[r] < 1 ? 'Type <b>!request</b> and a song name. An admin approves it, then it plays next.' : 'Type <b>!request</b> and a song name to play it next.';
+    $('hint').innerHTML = RANK[r] < 1 ? 'Type <b>!request</b> and a song name. An admin approves it, then it plays next. <b>!skip</b> starts a vote to skip.' : 'Type <b>!request</b> and a song name to play it next. <b>!skip</b> starts a vote to skip.' + (canControl(me) ? ' <b>!pause</b> and <b>!play</b> control the TV.' : '');
     $('manage').hidden = r !== 'owner';
   }
 
@@ -571,14 +586,14 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   let mq = null;
   const T = {state: 'auxtogether/' + room, tour: 'auxtour/' + room, chat: 'auxchat/' + room, hist: 'auxchat/' + room + '/h',
              roles: 'auxroles/' + room, users: 'auxusers/' + room, tv: 'auxtv/' + room, queue: 'auxqueue/' + room,
-             log: 'auxchat/' + room + '/m', purge: 'auxchat/' + room + '/purge'};
+             log: 'auxchat/' + room + '/m', purge: 'auxchat/' + room + '/purge', here: 'auxhere/' + room};
   function connect() {
     const lib = document.createElement('script');
     lib.src = 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js';
     lib.onload = () => {
       const c = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {clientId: 'auxweb-' + Math.random().toString(16).slice(2), clean: true, reconnectPeriod: 3000, connectTimeout: 8000});
       mq = c;
-      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue, T.log + '/+', T.purge]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
+      c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue, T.log + '/+', T.purge, T.here]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
       c.on('close', () => { $('liveText').textContent = 'Reconnecting…'; });
       c.on('message', (t, p, packet) => {
         const s = p.toString();
@@ -592,6 +607,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
         else if (t.startsWith(T.users + '/')) userIn(s);
         else if (t === T.tv) tvIn(s);
         else if (t === T.queue) queueIn(s);
+        else if (t === T.here && !(packet && packet.retain)) hereIn(s);
       });
     };
     document.head.appendChild(lib);
@@ -637,7 +653,21 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   async function sayHello() {
     if (!me || !mq || !mq.connected) return;
     mq.publish(T.users + '/' + me.sub, await signed({type: 'hello', nick: me.nick || '', dh: dhPub, ts: Date.now()}), {retain: true});
+    sayHere();
   }
+
+  // ---- Who's in the room right now: every signed-in page says "here" every 25s (signed, so it can't be faked).
+  const present = new Map();
+  async function sayHere() {
+    if (!me || !mq || !mq.connected) return;
+    mq.publish(T.here, await signed({type: 'here', ts: Date.now()}));
+  }
+  setInterval(sayHere, 25000);
+  async function hereIn(raw) {
+    const m = await open(raw);
+    if (m && m.body.type === 'here') present.set(m.who.sub, Date.now());
+  }
+  const inRoom = () => { const now = Date.now(), set = new Set(); for (const [sub, t] of present) if (now - t < 70000) set.add(sub); if (me) set.add(me.sub); return set; };
 
   // ------------------------------------------------------------ chat
   const chat = new Map(); // key -> {who, body, el}
@@ -686,6 +716,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const m = await open(raw);
     if (!m || typeof m.body.id !== 'string') return;
     if (m.body.ts <= purgeTs) return;
+    if (m.body.type === 'vote') { voteIn(m); return; }
     const key = m.who.sub + ':' + m.body.id;
     if (chat.has(key)) return;
     if (m.body.type === 'whisper') {
@@ -702,6 +733,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       m.body = Object.assign({}, m.body, {text: ''});
     } else if (m.body.type !== 'chat' || typeof m.body.text !== 'string') return;
     chat.set(key, {who: m.who, body: m.body, raw: m.raw});
+    if (isSkip(m.body)) { const v = voteOf(key); v.yes.add(m.who.sub); v.no.delete(m.who.sub); }
     if (!fromCache) saveLog();
     if (fromCache) return;
     if (m.body.type === 'whisper' && m.who.sub !== me.sub) ping('🔒 ' + nickOf(m.who.sub, m.body));
@@ -933,6 +965,65 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   // ---- Song requests. Admins' and the owner's go straight to the TV. A listener's waits in the chat until an
   // admin or the owner taps ✓ (that sends it to the TV for them) or ✗. Decisions are signed chat messages too.
   const isRequest = t => /^!request\s+\S/i.test(t || '');
+  const isControl = t => /^!(pause|play)$/i.test(String(t || '').trim());
+  // ---- Skip votes. "!skip" starts one for the song that's on; it passes when 60% of the people in the room
+  // vote skip within a minute. The TV counts the (signed) votes itself and does the skipping.
+  const SKIP_SHARE = 0.6, VOTE_MS = 60000;
+  const isSkip = b => b && b.type === 'chat' && /^!skip$/i.test(String(b.text || '').trim()) && typeof b.song === 'string' && !!b.song;
+  const votes = new Map();   // vote key -> {yes:Set, no:Set}
+  const voteOf = k => { if (!votes.has(k)) votes.set(k, {yes: new Set(), no: new Set()}); return votes.get(k); };
+  function voteIn(m) {
+    const k = m.body.ref; if (typeof k !== 'string') return;
+    const v = voteOf(k);
+    if (m.body.yes) { v.yes.add(m.who.sub); v.no.delete(m.who.sub); } else { v.no.add(m.who.sub); v.yes.delete(m.who.sub); }
+    present.set(m.who.sub, Date.now());
+    updateVotes();
+  }
+  function voteOpen(k) {
+    const x = chat.get(k);
+    return !!(x && Date.now() - x.body.ts < VOTE_MS && state && !state.off && state.id === x.body.song);
+  }
+  function openVoteNow() {
+    for (const [k, x] of chat) if (isSkip(x.body) && voteOpen(k)) return k;
+    return null;
+  }
+  function tally(k) {
+    const v = voteOf(k), all = inRoom();
+    v.yes.forEach(s => all.add(s)); v.no.forEach(s => all.add(s));
+    const total = Math.max(1, all.size), need = Math.max(1, Math.ceil(total * SKIP_SHARE - 1e-9));
+    return {yes: v.yes.size, no: v.no.size, total, need};
+  }
+  async function castVote(k, yes) {
+    if (!me || !mq || !mq.connected || !voteOpen(k)) return;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const msg = await signed({type: 'vote', id, ref: k, yes, nick: me.nick, ts: Date.now()});
+    voteIn({who: me, body: {ref: k, yes}});
+    mq.publish(T.chat, msg);
+  }
+  function fillVote(el, k) {
+    const x = chat.get(k); if (!x) return;
+    const t = tally(k), open = voteOpen(k), mine = me ? (voteOf(k).yes.has(me.sub) ? 'yes' : voteOf(k).no.has(me.sub) ? 'no' : '') : '';
+    el.replaceChildren();
+    const bar = document.createElement('div'); bar.className = 'vbar';
+    const fill = document.createElement('i'); fill.style.width = Math.min(100, t.yes / t.need * 100) + '%'; bar.append(fill);
+    const line = document.createElement('div'); line.className = 'vline';
+    const passed = t.yes >= t.need;
+    line.textContent = passed ? 'Passed: skipping…' : t.yes + ' of ' + t.need + ' skip votes needed (' + t.total + ' in the room)' + (t.no ? ' · ' + t.no + ' keep' : '');
+    el.append(bar, line);
+    if (open && !passed && me) {
+      const row = document.createElement('div'); row.className = 'vbtns';
+      const y = document.createElement('button'); y.type = 'button'; y.textContent = '⏭ Skip'; if (mine === 'yes') y.className = 'on';
+      const n = document.createElement('button'); n.type = 'button'; n.textContent = 'Keep it'; if (mine === 'no') n.className = 'on';
+      y.addEventListener('click', () => castVote(k, true));
+      n.addEventListener('click', () => castVote(k, false));
+      const left = document.createElement('span'); left.className = 'vleft'; left.textContent = Math.max(0, Math.ceil((VOTE_MS - (Date.now() - x.body.ts)) / 1000)) + 's';
+      row.append(y, n, left); el.append(row);
+    } else if (!open && !passed) { const c = document.createElement('div'); c.className = 'vline'; c.textContent = 'Vote closed'; el.append(c); }
+    el.classList.toggle('closed', !open);
+  }
+  function updateVotes() { document.querySelectorAll('#msgs .vote[data-key]').forEach(el => fillVote(el, el.dataset.key)); }
+  setInterval(() => { if (document.querySelector('#msgs .vote:not(.closed)')) updateVotes(); }, 1000);
+  const canControl = who => !!who && (who.owner || (roleOf(who) === 'admin' && !!(roles[who.sub] && roles[who.sub].ctl)));
   const reqQuery = t => String(t || '').replace(/^!request\s+/i, '').trim();
   function decisionsNow() {
     const d = new Map();
@@ -990,11 +1081,18 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       if (isW) { const w = document.createElement('span'); w.className = 'wtag'; w.textContent = who.sub === me.sub ? '🔒 to ' + nickOf(body.to) : '🔒 whispered to you'; name.append(w); }
       const t = document.createElement('time'); t.textContent = new Date(body.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); name.append(t);
       const text = document.createElement('div'); text.className = 'text';
+      let voteEl = null;
       const isReq = !isW && isRequest(body.text);
       if (isReq) { text.classList.add('req'); text.textContent = 'Requested: ' + reqQuery(body.text); }
+      else if (!isW && isSkip(body)) {
+        text.classList.add('cmd'); text.textContent = 'wants to skip ' + (body.title ? '“' + String(body.title).slice(0, 80) + '”' : 'this song');
+        voteEl = document.createElement('div'); voteEl.className = 'vote'; voteEl.dataset.key = it.k; fillVote(voteEl, it.k);
+      }
+      else if (!isW && isControl(body.text) && canControl(who)) { text.classList.add('cmd'); text.textContent = /play/i.test(body.text) ? '▶ pressed play' : '⏸ paused the music'; }
       else if (isW) text.textContent = body.text;
       else text.append(...withMentions(body.text));
       right.append(name, text);
+      if (voteEl) right.append(voteEl);
       if (isReq && !body.ref && RANK[r] < 1) {
         // A listener's request: show where it stands.
         const st = document.createElement('div'); st.className = 'rq';
@@ -1021,6 +1119,16 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const text = $('chatText').value.trim().slice(0, 300);
     if (!text || !mq || !mq.connected || Date.now() - lastSent < 700) return;
     if (/^!request\s*$/i.test(text)) { notes.push({ts: Date.now(), text: 'Type the song after !request, like: !request Mr. Brightside', ok: false}); drawChat(); return; }
+    if (!whisperTarget && isControl(text) && !canControl(me)) {
+      notes.push({ts: Date.now(), text: me && roleOf(me) === 'admin' ? 'The owner needs to turn on Pause / play for you first.' : 'Only the owner (and admins the owner allows) can pause and play.', ok: false}); drawChat(); return;
+    }
+    let skipExtra = null;
+    if (!whisperTarget && /^!skip$/i.test(text)) {
+      if (!state || state.off || !state.id) { notes.push({ts: Date.now(), text: 'Nothing is playing to skip.', ok: false}); drawChat(); return; }
+      const open = openVoteNow();
+      if (open) { $('chatText').value = ''; castVote(open, true); return; }   // a vote is already going: that's a skip vote
+      skipExtra = {song: state.id, title: state.t || ''};
+    }
     const listenerReq = !whisperTarget && isRequest(text) && RANK[roleOf(me)] < 1;
     if (listenerReq) {
       const wait = 30000 - (Date.now() - lastReq);
@@ -1038,7 +1146,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       const iv = crypto.getRandomValues(new Uint8Array(12));
       const ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, await pairKey(p.dh), enc.encode(text));
       body = {type: 'whisper', id, to: whisperTarget, toDh: p.dh, fromDh: dhPub, iv: b64u(iv), ct: b64u(ct), nick: me.nick, ts: Date.now()};
-    } else body = {type: 'chat', id, text, nick: me.nick, ts: Date.now()};
+    } else body = Object.assign({type: 'chat', id, text, nick: me.nick, ts: Date.now()}, skipExtra || {});
     const msg = await signed(body);
     chatIn(msg);
     mq.publish(T.chat, msg);
@@ -1061,9 +1169,15 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       let ctl;
       if (p.owner) { ctl = document.createElement('span'); ctl.className = 'badge'; ctl.style.color = 'var(--gold)'; ctl.textContent = 'owner'; }
       else {
-        ctl = document.createElement('select'); ctl.dataset.sub = p.sub; ctl.dataset.name = p.nick || p.name;
-        for (const r of ['listener', 'admin']) { const o = document.createElement('option'); o.value = r; o.textContent = r[0].toUpperCase() + r.slice(1); ctl.append(o); }
-        ctl.value = roles[p.sub] && roles[p.sub].r === 'admin' ? 'admin' : 'listener';
+        const sel = document.createElement('select'); sel.dataset.sub = p.sub; sel.dataset.name = p.nick || p.name;
+        for (const r of ['listener', 'admin']) { const o = document.createElement('option'); o.value = r; o.textContent = r[0].toUpperCase() + r.slice(1); sel.append(o); }
+        sel.value = roles[p.sub] && roles[p.sub].r === 'admin' ? 'admin' : 'listener';
+        const lab = document.createElement('label'); lab.title = 'Let this admin use !pause and !play';
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'ctlbox'; cb.checked = !!(roles[p.sub] && roles[p.sub].ctl);
+        lab.append(cb, 'Pause / play');
+        lab.hidden = sel.value !== 'admin';
+        sel.addEventListener('change', () => { lab.hidden = sel.value !== 'admin'; });
+        ctl = document.createElement('div'); ctl.className = 'ctl'; ctl.append(sel, lab);
       }
       row.append(img, txt, ctl); list.append(row);
     }
@@ -1086,7 +1200,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const next = {};
     for (const [sub, v] of Object.entries(roles)) if (v && v.r === 'admin') next[sub] = v;
     document.querySelectorAll('#people select').forEach(s => {
-      if (s.value === 'admin') next[s.dataset.sub] = {r: 'admin', n: s.dataset.name}; else delete next[s.dataset.sub];
+      const allow = s.parentElement.querySelector('.ctlbox');
+      if (s.value === 'admin') next[s.dataset.sub] = Object.assign({r: 'admin', n: s.dataset.name}, allow && allow.checked ? {ctl: true} : {});
+      else delete next[s.dataset.sub];
     });
     const msg = await signed({type: 'roles', roles: next, ts: Date.now()});
     mq.publish(T.roles, msg, {retain: true});
