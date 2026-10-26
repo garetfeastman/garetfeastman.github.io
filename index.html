@@ -127,8 +127,8 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .msg .who { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .msg .who time { font-weight: 400; color: var(--muted); font-size: 12px; }
 .badge { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; border: 1px solid currentColor; font-weight: 700; }
-.r-owner .who > span:first-child, .r-owner .badge { color: var(--gold); }
-.r-admin .who > span:first-child, .r-admin .badge { color: var(--admin); }
+.r-owner .who > span:nth-child(2) { color: var(--gold); }
+.r-admin .who > span:nth-child(2) { color: var(--admin); }
 .msg .text { color: var(--soft); overflow-wrap: anywhere; font-size: 15px; }
 .msg .text.req { color: #fff; }
 .msg .text.req::before { content: "♪ "; color: var(--aux); }
@@ -139,8 +139,12 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .whisper-to { flex-basis: 100%; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #c9b6ff; }
 .whisper-to[hidden] { display: none; }
 .whisper-to button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
-.msg .who > span:first-child, .msg img { cursor: pointer; }
-.msg .who > span:first-child:hover { text-decoration: underline; }
+.msg .who > span:nth-child(2), .msg img { cursor: pointer; }
+.msg .who > span:nth-child(2):hover { text-decoration: underline; }
+.ricon { display: inline-flex; width: 15px; height: 15px; flex: none; }
+.ricon-owner { color: var(--gold); filter: drop-shadow(0 0 4px rgba(245,196,81,.45)); }
+.ricon-admin { color: var(--admin); }
+.ricon-listener { color: #6f6f78; }
 .mention { color: #fff; background: rgba(122,162,255,.18); border-radius: 5px; padding: 0 3px; }
 .mention.me { background: rgba(255,78,106,.28); }
 .msg.at-me { background: rgba(255,78,106,.07); border-radius: 10px; margin: 0 -8px; padding: 4px 8px; }
@@ -516,8 +520,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   function showRole() {
     if (!me) return;
     const r = roleOf(me);
-    $('roleNote').textContent = r === 'listener' ? '' : r;
-    $('roleNote').style.color = r === 'owner' ? 'var(--gold)' : 'var(--admin)';
+    $('roleNote').replaceChildren(...(r === 'listener' ? [] : [roleIcon(r)]));
     $('hint').hidden = RANK[r] < 1;
     $('manage').hidden = r !== 'owner';
   }
@@ -712,7 +715,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   // ---- clicking a name / picture
   let whisperTarget = null;
   function hidePops() { $('userPop').hidden = true; $('mentionPop').hidden = true; }
-  document.addEventListener('click', e => { if (!e.target.closest('.pop') && !e.target.closest('.msg .who > span:first-child') && !e.target.closest('.msg img')) $('userPop').hidden = true; });
+  document.addEventListener('click', e => { if (!e.target.closest('.pop') && !e.target.closest('.msg .who > span:nth-child(2)') && !e.target.closest('.msg img')) $('userPop').hidden = true; });
   function placePop(pop, x, y) {
     pop.hidden = false;
     const w = pop.offsetWidth, h = pop.offsetHeight;
@@ -790,6 +793,19 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mentionSel = (mentionSel + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length; showMentions(); }
     else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); items[mentionSel].dispatchEvent(new MouseEvent('mousedown')); }
   });
+  // Role marks in the chat: a crown for the owner, headphones for admins (they pick the music), a note for listeners.
+  const ROLE_ICONS = {
+    owner: ['Owner', '<path d="M3 18h18l-1.5-9-4.5 4-3-7-3 7-4.5-4z" fill="currentColor"/><circle cx="12" cy="4.5" r="1.6" fill="currentColor"/><circle cx="3.2" cy="8.2" r="1.4" fill="currentColor"/><circle cx="20.8" cy="8.2" r="1.4" fill="currentColor"/><rect x="3" y="19.5" width="18" height="2" rx="1" fill="currentColor"/>'],
+    admin: ['Admin: can request songs', '<path d="M4 14v-2a8 8 0 0 1 16 0v2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="2.5" y="13" width="5" height="8" rx="2" fill="currentColor"/><rect x="16.5" y="13" width="5" height="8" rx="2" fill="currentColor"/>'],
+    listener: ['Listener', '<path d="M10 17.5V5l9-2v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="7.5" cy="17.5" r="2.8" fill="currentColor"/><circle cx="16.5" cy="15" r="2.8" fill="currentColor"/>']
+  };
+  function roleIcon(r) {
+    const [label, paths] = ROLE_ICONS[r] || ROLE_ICONS.listener;
+    const i = document.createElement('span'); i.className = 'ricon ricon-' + r; i.title = label;
+    i.setAttribute('role', 'img'); i.setAttribute('aria-label', label);
+    i.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">' + paths + '</svg>';
+    return i;
+  }
   function drawChat() {
     const box = $('msgs');
     const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
@@ -809,10 +825,10 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       img.addEventListener('click', e => userMenu(who.sub, e));
       const right = document.createElement('div');
       const name = document.createElement('div'); name.className = 'who';
-      const nm = document.createElement('span'); nm.textContent = nickOf(who.sub, body); name.append(nm);
+      const nm = document.createElement('span'); nm.textContent = nickOf(who.sub, body);
       nm.addEventListener('click', e => userMenu(who.sub, e));
+      name.append(roleIcon(r), nm);
       if (isW) { const w = document.createElement('span'); w.className = 'wtag'; w.textContent = who.sub === me.sub ? '🔒 to ' + nickOf(body.to) : '🔒 whispered to you'; name.append(w); }
-      if (r !== 'listener') { const b = document.createElement('span'); b.className = 'badge'; b.textContent = r; name.append(b); }
       const t = document.createElement('time'); t.textContent = new Date(body.ts).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'}); name.append(t);
       const text = document.createElement('div'); text.className = 'text';
       const isReq = /^!request\s+\S/i.test(body.text);
