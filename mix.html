@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AUX Mix</title>
+<meta name="description" content="A mix saved from AUX Together.">
+<meta name="theme-color" content="#080808">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap">
+<style>
+:root {
+  --night: #080808;
+  --panel: rgba(20, 20, 24, .72);
+  --line: rgba(255, 255, 255, .12);
+  --ink: #ffffff;
+  --soft: #e6e6e6;
+  --muted: #9a9a9a;
+  --aux: #ff4e6a;
+  --font: "Roboto", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--night); color: var(--ink); font: 16px/1.45 var(--font); min-height: 100dvh; }
+button, input { font: inherit; color: inherit; }
+#backdrop { position: fixed; inset: -8%; z-index: -2; background-size: cover; background-position: center; filter: blur(70px) saturate(1.25) brightness(.32); opacity: 0; transition: opacity 1.2s ease; }
+#backdrop.on { opacity: 1; }
+#shade { position: fixed; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.5), rgba(0,0,0,.85)); }
+.wrap { width: min(860px, 100%); margin: 0 auto; padding: 0 16px 48px; }
+.top { display: flex; align-items: center; gap: 12px; padding: 22px 0 10px; }
+.brand { font-weight: 900; font-size: 24px; letter-spacing: .02em; white-space: nowrap; display: inline-flex; align-items: baseline; text-decoration: none; color: var(--ink); }
+.brand b { color: var(--aux); position: relative; z-index: 2; letter-spacing: .02em; text-shadow: .035em 0 0 var(--night), .06em 0 0 var(--night), .035em .02em 0 var(--night), .035em -.02em 0 var(--night); }
+.brand .tg { position: relative; z-index: 1; margin-left: -.2em; }
+.head { display: grid; grid-template-columns: 180px 1fr; gap: 28px; align-items: end; padding: 34px 0 26px; }
+.cover { width: 180px; aspect-ratio: 1; border-radius: 18px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; background: #1a1a1f; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eyebrow { color: var(--aux); letter-spacing: .2em; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+h1 { margin: 8px 0 6px; font-size: clamp(30px, 6vw, 56px); line-height: 1.05; font-weight: 900; overflow-wrap: anywhere; }
+.meta { color: var(--muted); font-size: 15px; }
+.acts { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 22px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 22px; border-radius: 999px; border: 1px solid var(--line); background: #1e1e24; color: var(--soft); font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.btn:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+.btn.hot { background: var(--aux); border-color: var(--aux); color: #fff; }
+.btn:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+.note { color: var(--muted); font-size: 13.5px; margin: -10px 0 22px; }
+.list { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 8px; backdrop-filter: blur(10px); }
+.row { display: grid; grid-template-columns: 28px 52px 1fr auto; gap: 14px; align-items: center; padding: 8px; border-radius: 12px; text-decoration: none; color: inherit; }
+.row:hover { background: rgba(255,255,255,.05); }
+.row .n { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.row img { width: 52px; height: 52px; border-radius: 8px; object-fit: cover; background: #222; }
+.row .tt { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .aa { font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .len { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.bad { padding: 60px 0; text-align: center; color: var(--muted); }
+.bad h1 { color: var(--ink); }
+@media (max-width: 600px) {
+  .head { grid-template-columns: 1fr; gap: 18px; padding-top: 18px; }
+  .cover { width: 140px; }
+  .btn { height: 42px; padding: 0 16px; }
+}
+</style>
+</head>
+<body>
+<div id="backdrop"></div><div id="shade"></div>
+<div class="wrap">
+  <header class="top"><a class="brand" href="./" aria-label="AUX Together"><b>AUX</b><span class="tg">Together</span></a></header>
+  <main id="main"></main>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const main = $('main');
+  const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const fmt = s => { s = Math.round(s || 0); return s ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : ''; };
+  const thumb = id => 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg';
+
+  function broken(why) {
+    const b = el('div', 'bad');
+    b.append(el('h1', '', "This mix link doesn't work"), el('p', '', why || 'It may have been cut off when it was copied. Ask for the link again.'));
+    main.replaceChildren(b);
+  }
+  async function unpack(data) {
+    const z = new Blob([unb64u(data)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    const m = JSON.parse(await new Response(z).text());
+    if (!m || m.v !== 1 || !Array.isArray(m.s)) throw new Error('bad');
+    m.s = m.s.filter(x => Array.isArray(x) && /^[\w-]{11}$/.test(x[0])).slice(0, 200);
+    if (!m.s.length) throw new Error('empty');
+    return m;
+  }
+
+  async function show() {
+    const data = (location.hash || '').replace(/^#/, '');
+    if (!/^[\w-]{8,}$/.test(data)) return broken('There are no songs in this link.');
+    let m;
+    try { m = await unpack(data); } catch (_) { return broken(); }
+    const name = String(m.n || 'AUX Mix').slice(0, 60);
+    document.title = name + ' · AUX Mix';
+
+    const bd = $('backdrop'); const pic = new Image();
+    pic.onload = () => { bd.style.backgroundImage = 'url("' + pic.src + '")'; bd.classList.add('on'); };
+    pic.src = thumb(m.s[0][0]);
+
+    const head = el('section', 'head');
+    const cover = el('div', 'cover');
+    const ids = m.s.map(x => x[0]);
+    (ids.length >= 4 ? ids.slice(0, 4) : [ids[0]]).forEach((id, i, a) => {
+      const im = el('img'); im.alt = ''; im.referrerPolicy = 'no-referrer'; im.src = thumb(id);
+      if (a.length === 1) im.style.gridColumn = '1 / 3';
+      cover.append(im);
+    });
+    const info = el('div');
+    const total = m.s.reduce((t, x) => t + (Number(x[3]) || 0), 0);
+    const when = m.d ? new Date(m.d).toLocaleDateString([], {month: 'long', day: 'numeric', year: 'numeric'}) : '';
+    info.append(el('div', 'eyebrow', 'AUX Mix'), el('h1', '', name),
+      el('div', 'meta', [when, m.s.length + (m.s.length === 1 ? ' song' : ' songs'), total > 60 ? Math.round(total / 60) + ' min' : ''].filter(Boolean).join(' · ')));
+    head.append(cover, info);
+
+    const acts = el('div', 'acts');
+    for (let i = 0; i < ids.length; i += 50) {
+      const a = el('a', 'btn hot', ids.length > 50 ? 'Save to YouTube Music · songs ' + (i + 1) + '–' + Math.min(ids.length, i + 50) : 'Save to YouTube Music');
+      a.href = 'https://www.youtube.com/watch_videos?video_ids=' + ids.slice(i, i + 50).join(',');
+      a.target = '_blank'; a.rel = 'noopener';
+      acts.append(a);
+    }
+    const keep = el('button', 'btn', 'Keep in My mixes'); keep.type = 'button';
+    keep.addEventListener('click', () => {
+      try {
+        const all = JSON.parse(localStorage.getItem('aux-mixes') || '[]').filter(x => x && x.data !== data);
+        all.unshift({n: name, d: m.d || Date.now(), c: m.s.length, r: m.r || '', data});
+        localStorage.setItem('aux-mixes', JSON.stringify(all.slice(0, 100)));
+        keep.textContent = '✓ In My mixes';
+      } catch (_) { keep.textContent = "Couldn't save on this browser"; }
+    });
+    const copy = el('button', 'btn', 'Copy link'); copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(location.href); copy.textContent = 'Copied'; } catch (_) { copy.textContent = 'Copy the address bar'; }
+      setTimeout(() => { copy.textContent = 'Copy link'; }, 1600);
+    });
+    acts.append(keep, copy);
+    if (/^[\w-]{3,40}$/.test(m.r || '')) {
+      const room = el('a', 'btn', 'Play it in the AUX room');
+      room.href = './#' + m.r + '&mix=' + data;
+      acts.append(room);
+    }
+    const note = el('p', 'note', 'YouTube opens the songs as a playlist. Save it there and it shows up in YouTube Music under Library.');
+
+    const list = el('section', 'list');
+    m.s.forEach((x, i) => {
+      const row = el('a', 'row'); row.href = 'https://music.youtube.com/watch?v=' + x[0]; row.target = '_blank'; row.rel = 'noopener';
+      const im = el('img'); im.alt = ''; im.loading = 'lazy'; im.referrerPolicy = 'no-referrer'; im.src = 'https://i.ytimg.com/vi/' + x[0] + '/default.jpg';
+      const txt = el('div'); txt.style.minWidth = '0';
+      txt.append(el('div', 'tt', String(x[1] || 'Unknown song')), el('div', 'aa', String(x[2] || '')));
+      row.append(el('span', 'n', String(i + 1)), im, txt, el('span', 'len', fmt(x[3])));
+      list.append(row);
+    });
+    main.replaceChildren(head, acts, note, list);
+  }
+  if (!('DecompressionStream' in window)) broken('This browser is too old to open mix links. Try Chrome, Edge, Firefox or Safari.');
+  else show();
+  addEventListener('hashchange', show);
+})();
+</script>
+</body>
+</html>
