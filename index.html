@@ -57,9 +57,15 @@ button, input, select { font: inherit; color: inherit; }
 .me[hidden] { display: none; }
 
 /* Main: record | song | chat */
-.room { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, min(30vw, 480px)) minmax(300px, min(28vw, 440px)); gap: 40px; align-items: stretch; padding: 6px 0 26px; }
+.room { --rec: min(54vh, 34vw); min-height: 0; display: grid; grid-template-columns: var(--rec) minmax(300px, 480px) minmax(290px, 430px); justify-content: center; column-gap: 72px; align-items: stretch; padding: 6px 0 26px; }
 .left { display: flex; flex-direction: column; align-items: center; gap: 16px; min-width: 0; padding-top: 34px; }
-.record { position: relative; width: min(100%, 58vh); aspect-ratio: 1; }
+.record { position: relative; width: 100%; aspect-ratio: 1; }
+/* Tonearm: rests off the record, swings on when you join. */
+.arm { position: absolute; z-index: 3; left: -5%; top: -3%; width: 26%; height: 58%; pointer-events: none;
+       transform-origin: 20% 10%; transform: rotate(11deg); transition: transform 1.3s cubic-bezier(.45,.05,.25,1); filter: drop-shadow(0 8px 10px rgba(0,0,0,.6)); }
+.arm svg { width: 100%; height: 100%; overflow: visible; display: block; transform: scaleX(-1); }
+.joined .arm { transform: rotate(-17deg); }
+.peek .arm { opacity: 0; }
 .left .controls { margin-top: 6px; justify-content: center; }
 .left .status { margin-top: 0; text-align: center; max-width: 58vh; }
 .middle { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 22px; }
@@ -171,7 +177,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   body { overflow: auto; }
   .app { height: auto; min-height: 100dvh; padding: 0 16px; }
   .room { grid-template-columns: minmax(0, 1fr); gap: 26px; padding-bottom: 24px; }
-  .record { width: min(100%, 420px); }
+  .record { width: min(calc(100% - 40px), 420px); }
   .chat { height: 460px; flex: none; }
   .queue { max-height: 560px; }
   .left { padding-top: 0; }
@@ -207,6 +213,19 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
           <img id="art" alt="" hidden>
           <div class="label" id="label"><div id="yt"></div></div>
           <div class="spindle"></div>
+        </div>
+        <div class="arm" aria-hidden="true">
+          <svg viewBox="0 0 100 200" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="armMetal" x1="0" x2="1"><stop offset="0" stop-color="#8d8d94"/><stop offset=".5" stop-color="#e9e9ee"/><stop offset="1" stop-color="#7b7b82"/></linearGradient>
+            </defs>
+            <rect x="72" y="0" width="16" height="12" rx="3" fill="#2a2a30" stroke="#55555c" stroke-width="1"/>
+            <circle cx="80" cy="20" r="15" fill="#1c1c21" stroke="#4a4a52" stroke-width="2"/>
+            <circle cx="80" cy="20" r="7" fill="url(#armMetal)"/>
+            <path d="M80 20 L80 140 L64 172" fill="none" stroke="url(#armMetal)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="52" y="166" width="20" height="24" rx="3" transform="rotate(28 62 178)" fill="#d8d8de" stroke="#6a6a72" stroke-width="1"/>
+            <rect x="58" y="186" width="6" height="6" rx="1" transform="rotate(28 62 178)" fill="#ff4e6a"/>
+          </svg>
         </div>
       </div>
       <div class="controls">
@@ -484,9 +503,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       mq = c;
       c.on('connect', () => { c.subscribe([T.state, T.tour, T.chat, T.hist, T.roles, T.users + '/+', T.tv, T.queue]); if (!state) $('liveText').textContent = 'Waiting'; if (me) sayHello(); });
       c.on('close', () => { $('liveText').textContent = 'Reconnecting…'; });
-      c.on('message', (t, p) => {
+      c.on('message', (t, p, packet) => {
         const s = p.toString();
-        if (t === T.state) receive(s);
+        if (t === T.state) receive(s, packet && packet.retain);
         else if (t === T.tour) tourIn(s);
         else if (t === T.chat) chatIn(s);
         else if (t === T.hist) { try { (JSON.parse(s) || []).forEach(chatIn); } catch (_) {} }
@@ -653,11 +672,22 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   });
 
   // ------------------------------------------------------------ what's playing on the TV
-  let state = null, recvAt = 0, lag = 0, player = null, ready = false, joined = false, loadedId = '', blocked = '';
+  let state = null, player = null, ready = false, joined = false, loadedId = '', blocked = '';
+  // ---- The TV's clock. A friend's computer clock can be seconds off, so we never trust it directly:
+  // every update from the TV says when (TV time) it was sent; the smallest gap between "sent" and
+  // "arrived here" over the last couple of minutes is the clock difference plus the quickest network trip.
+  const gaps = []; let offset = null;
+  function clockSample(ts) {
+    if (!ts) return;
+    gaps.push(Date.now() - ts);
+    if (gaps.length > 30) gaps.shift();
+    offset = Math.min(...gaps);
+  }
+  const tvNow = () => offset === null ? Date.now() : Date.now() - offset + 80; // +80ms ≈ quickest network trip
   function expected() {
     if (!state) return 0;
     let p = state.pos || 0;
-    if (state.playing) p += lag + (Date.now() - recvAt) / 1000;
+    if (state.playing) p += Math.max(0, tvNow() - state.ts) / 1000;
     return state.dur ? Math.min(p, state.dur) : p;
   }
   function render() {
@@ -692,42 +722,82 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-  function sync(force) {
-    if (!joined || !ready || !state) return;
-    if (state.off) { player.pauseVideo(); return; }
-    const want = expected();
-    if (state.id !== loadedId) {
-      loadedId = state.id; blocked = '';
-      if (state.playing) player.loadVideoById({videoId: state.id, startSeconds: want});
-      else player.cueVideoById({videoId: state.id, startSeconds: want});
+  // ---- Staying in sync. Two rules: never make small jumps while a song plays, and when a jump is
+  // needed, land exactly on time: jump a little AHEAD, let it buffer (quietly), pause there, then start
+  // the instant the TV reaches that spot.
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let syncGen = 0, syncing = false, lead = 2, badTicks = 0, bufferingSince = 0;
+  const vol = () => Number($('volume').value);
+  function soundOn() { if (!ready) return; if (vol() > 0) player.unMute(); player.setVolume(vol()); }
+  async function hardSync(attempt = 0) {
+    if (!joined || !ready || !state || state.off || blocked) return;
+    const gen = ++syncGen; syncing = true; badTicks = 0;
+    try {
+      if (!state.playing) {
+        if (state.id !== loadedId) { loadedId = state.id; player.cueVideoById({videoId: state.id, startSeconds: expected()}); }
+        else { player.pauseVideo(); player.seekTo(expected(), true); }
+        return;
+      }
+      const target = expected() + lead;
+      if (state.dur && target > state.dur - 1) return; // song is about to end; wait for the next one
+      player.mute();
+      if (state.id !== loadedId) { loadedId = state.id; player.loadVideoById({videoId: state.id, startSeconds: target}); }
+      else { player.seekTo(target, true); player.playVideo(); }
+      // Wait until it's actually playing at the spot (buffered). Ads also land here; they play muted.
+      const t0 = Date.now();
+      for (;;) {
+        await sleep(40);
+        if (gen !== syncGen) return;
+        if (player.getPlayerState() === YT.PlayerState.PLAYING && (player.getCurrentTime() || 0) >= target - 0.05) break;
+        if (Date.now() - t0 > 60000) { soundOn(); return; }
+      }
+      player.pauseVideo();
+      const early = (player.getCurrentTime() || 0) - expected(); // seconds we're ahead of the TV
+      if (early < 0.05) {
+        // Buffering took longer than the head start; give it more and try again.
+        // (A long wait was probably an ad, which says nothing about the connection.)
+        if (Date.now() - t0 < 8000) lead = Math.min(8, lead + Math.max(0.5, -early + 0.5));
+        if (attempt < 3) { syncing = false; return hardSync(attempt + 1); }
+        player.playVideo(); soundOn(); return;
+      }
+      await sleep(early * 1000);
+      if (gen !== syncGen) return;
+      player.playVideo(); soundOn();
+      // Learn how much head start this connection needs (shrink slowly when it's plenty).
+      if (early > 1.5) lead = Math.max(1.2, lead - 0.3);
       $('status').textContent = '';
+    } finally { if (gen === syncGen) syncing = false; }
+  }
+  // Once a second: only re-sync when it's clearly off (more than 0.7s for 3 seconds straight) or stalled.
+  setInterval(() => {
+    if (!joined || !ready || !state || syncing || blocked) return;
+    if (state.off) { player.pauseVideo(); return; }
+    if (state.id !== loadedId) { hardSync(); return; }
+    const ps = player.getPlayerState();
+    if (!state.playing) { if (ps === YT.PlayerState.PLAYING) player.pauseVideo(); return; }
+    if (state.dur && expected() >= state.dur - 2) return; // let the song finish naturally
+    if (ps === YT.PlayerState.BUFFERING) {
+      if (!bufferingSince) bufferingSince = Date.now();
+      if (Date.now() - bufferingSince > 4000) { bufferingSince = 0; hardSync(); }
       return;
     }
-    if (blocked) return;
-    const ps = player.getPlayerState();
-    if (state.playing) {
-      if (ps === YT.PlayerState.ENDED || (state.dur && want >= state.dur - 1.5)) return;
-      if (ps !== YT.PlayerState.PLAYING && ps !== YT.PlayerState.BUFFERING) player.playVideo();
-      const cur = player.getCurrentTime() || 0;
-      if (force ? Math.abs(cur - want) > 1.5 : Math.abs(cur - want) > 5) player.seekTo(want, true);
-    } else {
-      if (ps === YT.PlayerState.PLAYING) player.pauseVideo();
-      if (Math.abs((player.getCurrentTime() || 0) - want) > (force ? 1.5 : 5)) player.seekTo(want, true);
-    }
-  }
-  setInterval(() => sync(false), 2000);
-  function receive(raw) {
+    bufferingSince = 0;
+    if (ps !== YT.PlayerState.PLAYING) { hardSync(); return; }
+    const drift = (player.getCurrentTime() || 0) - expected();
+    if (Math.abs(drift) > 0.7) { if (++badTicks >= 3) hardSync(); } else badTicks = 0;
+  }, 1000);
+  function receive(raw, retained) {
     let s; try { s = JSON.parse(raw); } catch (_) { return; }
     if (!s || s.v !== 1) return;
     if (state && s.ts && state.ts && s.ts < state.ts) return;
-    const age = Date.now() - (s.ts || Date.now());
-    if (age > 6 * 3600 * 1000) return;
+    if (!retained) clockSample(s.ts);
+    if (Date.now() - (s.ts || Date.now()) > 6 * 3600 * 1000 && offset === null) return;
     const before = state ? expected() : 0;
     const changed = !state || state.off || s.off || s.id !== state.id || !!s.playing !== !!state.playing;
-    state = s; recvAt = Date.now();
-    lag = age > 0 && age < 8000 ? Math.min(1.5, age / 1000) : 0.3;
-    const jumped = !changed && Math.abs(expected() - before) > 4;
-    render(); sync(changed || jumped); drawTour(); if (changed) drawQueue();
+    state = s;
+    const jumped = !changed && Math.abs(expected() - before) > 3; // the TV skipped within the song
+    render(); drawTour(); if (changed) drawQueue();
+    if (changed || jumped) hardSync();
   }
 
   // Upcoming shows for the artist that's playing (the TV looks them up).
@@ -758,10 +828,10 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       width: '100%', height: '100%',
       playerVars: {autoplay: 0, controls: 0, playsinline: 1, rel: 0, modestbranding: 1},
       events: {
-        onReady: () => { ready = true; player.setVolume(Number($('volume').value)); if (joined) sync(true); },
+        onReady: () => { ready = true; player.setVolume(vol()); if (joined) hardSync(); },
         onError: e => {
           if ([100, 101, 150].includes(e.data) && state) {
-            blocked = state.id;
+            blocked = state.id; syncGen++; syncing = false;
             const t = Math.floor(expected());
             $('status').innerHTML = 'This song can only play on YouTube Music. <a target="_blank" rel="noopener" href="https://music.youtube.com/watch?v=' + encodeURIComponent(state.id) + '&t=' + t + 's">Open it there</a>.';
           }
@@ -776,11 +846,10 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     joined = true; document.body.classList.add('joined'); $('peek').hidden = false;
     $('join').hidden = true; $('leave').hidden = false;
     $('status').textContent = state && !state.off ? '' : 'Music starts when the TV plays something.';
-    if (ready) { player.unMute(); player.setVolume(Number($('volume').value)); }
-    loadedId = ''; sync(true);
+    loadedId = ''; hardSync();
   });
   $('leave').addEventListener('click', () => {
-    joined = false; loadedId = ''; document.body.classList.remove('joined', 'peek'); $('peek').hidden = true; $('peek').textContent = 'Ad playing? Show the player';
+    joined = false; loadedId = ''; syncGen++; syncing = false; document.body.classList.remove('joined', 'peek'); $('peek').hidden = true; $('peek').textContent = 'Ad playing? Show the player';
     if (ready) player.stopVideo();
     $('join').hidden = false; $('leave').hidden = true;
     $('status').textContent = '';
@@ -789,7 +858,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
     const on = document.body.classList.toggle('peek');
     $('peek').textContent = on ? 'Back to the record' : 'Ad playing? Show the player';
   });
-  const setVol = () => { if (!ready) return; const v = Number($('volume').value); if (v > 0) player.unMute(); player.setVolume(v); };
+  const setVol = () => { if (!ready || syncing) return; soundOn(); };
   $('volume').addEventListener('input', setVol); $('volume').addEventListener('change', setVol);
   if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform))) {
     document.querySelector('label.vol').style.display = 'none';
