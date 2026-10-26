@@ -148,7 +148,9 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .gate .brand { font-size: 40px; margin: 0; }
 .gate p { color: var(--soft); margin: 0; font-size: 17px; }
 .gate small { color: var(--muted); font-size: 13px; max-width: 360px; }
-#gbtn { min-height: 44px; margin-top: 8px; }
+#gbtn { min-height: 44px; margin-top: 8px; background: transparent; color-scheme: light; }
+/* The page is dark; without this the browser paints Google's button frame white. */
+#gbtn iframe { color-scheme: light; background: transparent !important; }
 
 /* Owner panel */
 .modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0,0,0,.7); padding: 20px; }
