@@ -95,6 +95,12 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
 .album { font-size: 19px; color: var(--muted); margin: 4px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tourline { margin-top: 14px; font-size: 15px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 22px; }
 .tourline b { color: var(--aux); letter-spacing: .12em; margin-right: 10px; }
+.tourline .track { display: inline-block; white-space: nowrap; }
+.tourline.roll { -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 92%, transparent); mask-image: linear-gradient(90deg, transparent, #000 3%, #000 92%, transparent); }
+.tourline.roll .track { animation: tourroll var(--roll, 20s) linear infinite; }
+.tourline.roll:hover .track { animation-play-state: paused; }
+@keyframes tourroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .tourline.roll .track { animation: none; } }
 .tourline a { color: inherit; text-decoration: none; }
 .tourline a:hover { color: #fff; text-decoration: underline; }
 .tourline .d { color: #fff; font-weight: 500; margin-right: 6px; }
@@ -728,7 +734,7 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   let syncGen = 0, syncing = false, lead = 2, badTicks = 0, bufferingSince = 0;
   const vol = () => Number($('volume').value);
-  function soundOn() { if (!ready) return; if (vol() > 0) player.unMute(); player.setVolume(vol()); }
+  function soundOn() { if (!ready) return; if (vol() > 0) player.unMute(); else player.mute(); player.setVolume(vol()); }
   async function hardSync(attempt = 0) {
     if (!joined || !ready || !state || state.off || blocked) return;
     const gen = ++syncGen; syncing = true; badTicks = 0;
@@ -740,7 +746,8 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
       }
       const target = expected() + lead;
       if (state.dur && target > state.dur - 1) return; // song is about to end; wait for the next one
-      player.mute();
+      // Nearly silent (not muted) while lining up: browsers pause muted videos in background tabs.
+      player.unMute(); player.setVolume(1);
       if (state.id !== loadedId) { loadedId = state.id; player.loadVideoById({videoId: state.id, startSeconds: target}); }
       else { player.seekTo(target, true); player.playVideo(); }
       // Wait until it's actually playing at the spot (buffered). Ads also land here; they play muted.
@@ -760,8 +767,13 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
         if (attempt < 3) { syncing = false; return hardSync(attempt + 1); }
         player.playVideo(); soundOn(); return;
       }
-      await sleep(early * 1000);
-      if (gen !== syncGen) return;
+      // Wait in small steps (a single long timer can fire late in a background tab).
+      for (;;) {
+        const left = (player.getCurrentTime() || 0) - expected();
+        if (left <= 0.015) break;
+        await sleep(Math.min(250, Math.max(5, (left - 0.01) * 1000)));
+        if (gen !== syncGen) return;
+      }
       player.playVideo(); soundOn();
       // Learn how much head start this connection needs (shrink slowly when it's plenty).
       if (early > 1.5) lead = Math.max(1.2, lead - 0.3);
@@ -805,21 +817,37 @@ h1 { font-size: clamp(30px, 3.4vw, 52px); line-height: 1.04; font-weight: 700; m
   const normName = x => String(x || '').toLowerCase().replace(/&/g, 'and').replace(/^the\s+/, '').replace(/[^a-z0-9]/g, '');
   function tourIn(raw) { try { tour = JSON.parse(raw); } catch (_) { return; } drawTour(); }
   function drawTour() {
-    const box = $('tour'); box.replaceChildren();
+    const box = $('tour'); box.replaceChildren(); box.classList.remove('roll');
     const playing = state && !state.off ? normName(state.a) : '';
     if (!tour || !Array.isArray(tour.shows) || !playing || !playing.startsWith(normName(tour.artist))) return;
     if (!tour.shows.length) { box.textContent = 'No upcoming tour dates'; return; }
     const b = document.createElement('b'); b.textContent = 'ON TOUR'; box.append(b);
-    tour.shows.slice(0, 3).forEach((sh, i) => {
-      if (i) box.append('  ·  ');
-      const a = document.createElement('a');
-      if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
-      const dt = new Date(String(sh.d) + 'T12:00:00');
-      const d = document.createElement('span'); d.className = 'd'; d.textContent = isNaN(dt) ? sh.d : dt.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}).toUpperCase();
-      a.append(d, sh.c || '');
-      box.append(a);
+    // Every date in one line; if it doesn't fit, it scrolls (hover to pause).
+    const part = () => {
+      const span = document.createElement('span');
+      tour.shows.slice(0, 12).forEach((sh, i) => {
+        if (i) span.append('  ·  ');
+        const a = document.createElement('a');
+        if (/^https:\/\//.test(sh.u || '')) { a.href = sh.u; a.target = '_blank'; a.rel = 'noopener'; }
+        const dt = new Date(String(sh.d) + 'T12:00:00');
+        const d = document.createElement('span'); d.className = 'd'; d.textContent = isNaN(dt) ? sh.d : dt.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}).toUpperCase();
+        a.append(d, sh.c || '');
+        span.append(a);
+      });
+      return span;
+    };
+    const track = document.createElement('span'); track.className = 'track';
+    track.append(part());
+    box.append(track);
+    box.classList.remove('roll');
+    requestAnimationFrame(() => {
+      if (box.scrollWidth <= box.clientWidth + 2) return;
+      const gap = document.createElement('span'); gap.textContent = '      ·      ';
+      const copy = part();
+      track.append(gap, copy);
+      box.style.setProperty('--roll', Math.max(12, track.scrollWidth / 2 / 45) + 's');
+      box.classList.add('roll');
     });
-    if (tour.shows.length > 3) box.append('  +' + (tour.shows.length - 3) + ' more');
   }
 
   // ------------------------------------------------------------ YouTube's player (the record's label while listening)
